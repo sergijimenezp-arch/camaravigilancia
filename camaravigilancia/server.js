@@ -4,28 +4,32 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
-// 1. Configuración de rutas ABSOLUTAS (esto evita el "Cannot GET /")
-const publicPath = path.join(__dirname, 'public');
-console.log("Buscando archivos en:", publicPath);
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Servir archivos estáticos
-app.use(express.static(publicPath));
+let connectedUsers = 0;
 
-// Ruta principal explícita
-app.get('/', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
-});
-
-// 2. Lógica de Socket.io
 io.on('connection', (socket) => {
-    console.log('Cliente conectado');
+    connectedUsers++;
+    // Informar a todos cuánta gente hay conectada
+    io.emit('user-count', connectedUsers);
+
     socket.on('streaming', (image) => {
         socket.broadcast.emit('play-stream', image);
     });
+
+    // Lógica de la alarma
+    socket.on('trigger-alarm', () => {
+        console.log("¡ALARMA ACTIVADA DESDE REMOTO!");
+        socket.broadcast.emit('action-alarm');
+    });
+
+    socket.on('disconnect', () => {
+        connectedUsers--;
+        io.emit('user-count', connectedUsers);
+    });
 });
 
-// 3. Puerto dinámico para Render
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor GrowXpertIT funcionando en puerto ${PORT}`);
+    console.log(`GrowXpertIT Security Pro en puerto ${PORT}`);
 });
