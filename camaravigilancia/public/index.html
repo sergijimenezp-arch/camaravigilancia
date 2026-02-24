@@ -3,74 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GrowXpertIT BIOMETRIC + BODY TRACKING</title>
+    <title>GrowXpertIT HD AI SECURITY</title>
     <script src="/socket.io/socket.io.js"></script>
     
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
-    
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
     <style>
         body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
         
-        /* === LOGIN === */
         #login-screen { position: fixed; inset: 0; background: #050505; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #00ff41; }
-        input { background: #111; border: 1px solid #00ff41; color: #00ff41; padding: 12px; margin: 5px; outline: none; font-family: monospace; text-align: center; }
+        input { background: #111; border: 1px solid #00ff41; color: #00ff41; padding: 12px; margin: 5px; outline: none; text-align: center; }
         
-        /* === MONITOR PRINCIPAL === */
         .monitor { position: relative; width: 100vw; height: 100vh; display: none; }
         
-        /* --- CAMBIO CLAVE: Contenedor a pantalla completa --- */
-        #canvas-container { 
-            position: relative; 
-            width: 100%; 
-            height: 100vh; /* Ocupa el 100% de la altura */
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            background: #000;
-        }
-        
-        /* --- CAMBIO CLAVE: Canvas estirado al máximo --- */
-        canvas { 
-            position: absolute; 
-            width: 100%; /* Intenta ocupar todo el ancho */
-            height: 100%; /* Intenta ocupar todo el alto */
-            object-fit: contain; /* Se estira hasta tocar un borde sin deformarse */
-        }
-        
+        #canvas-container { position: relative; width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; }
+        canvas { position: absolute; width: 100%; height: 100%; object-fit: contain; }
         video { position: absolute; visibility: hidden; } 
 
-        /* === HUD (Interfaz sobre el video) === */
         .ui-overlay { position: absolute; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; z-index: 10; }
-        .top-left { top: 0; left: 0; border-left: 4px solid #00ff41; padding-left: 15px; background: rgba(0,0,0,0.3); }
-        .top-right { top: 0; right: 0; text-align: right; }
+        .top-left { top: 0; left: 0; border-left: 4px solid #00ff41; padding-left: 15px; background: rgba(0,0,0,0.5); }
+        .top-right { top: 0; right: 0; text-align: right; background: rgba(0,0,0,0.5); padding-right: 15px;}
         
-        /* === BOTONES FLOTANTES === */
-        .btn-panel { 
-            position: absolute; 
-            bottom: 30px; /* Un poco más arriba */
-            width: 100%; 
-            display: flex; 
-            justify-content: center; 
-            gap: 15px; 
-            pointer-events: all; 
-            z-index: 100; /* Muy por encima del video */
-        }
-        button { background: rgba(0, 255, 65, 0.8); color: #000; border: 1px solid #00ff41; padding: 15px 30px; font-weight: bold; cursor: pointer; font-family: monospace; text-transform: uppercase; backdrop-filter: blur(5px); }
-        button:hover { background: #00ff41; }
+        .btn-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 15px; pointer-events: all; z-index: 100; }
+        button { background: rgba(0, 255, 65, 0.8); color: #000; border: 1px solid #00ff41; padding: 15px 30px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         button.alarm { background: rgba(255, 0, 0, 0.8); color: #fff; border: 1px solid #ff0000; }
-        button.alarm:hover { background: #ff0000; }
 
-        #status-bar { position: absolute; bottom: 90px; width: 100%; text-align: center; background: rgba(0,0,0,0.5); padding: 5px; z-index: 90; }
+        #status-bar { position: absolute; bottom: 90px; width: 100%; text-align: center; background: rgba(0,0,0,0.7); padding: 5px; z-index: 90; font-weight: bold; }
         
-        /* === ALERTA INTRUSO === */
-        #intruder-ui { 
-            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            background: rgba(0,0,0,0.95); padding: 30px; border: 3px solid #ff0000; z-index: 200; 
-            text-align: center; pointer-events: all; box-shadow: 0 0 30px #ff0000;
-        }
+        #intruder-ui { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 30px; border: 3px solid #ff0000; z-index: 200; text-align: center; pointer-events: all; box-shadow: 0 0 30px #ff0000; }
         .blink-red { animation: blink 1s infinite; color: red; }
         @keyframes blink { 50% { opacity: 0; } }
     </style>
@@ -79,8 +41,7 @@
 
     <div id="login-screen">
         <h1 style="letter-spacing: 5px;">GROWXPERT-IT</h1>
-        <h3>BIOMETRIC SECURITY SYSTEM</h3>
-        <input type="text" id="user" placeholder="USUARIO ID">
+        <h3>HD BIOMETRIC SYSTEM</h3>
         <input type="password" id="pass" placeholder="CÓDIGO DE ACCESO">
         <button onclick="checkLogin()" style="margin-top: 20px;">INICIAR TERMINAL</button>
     </div>
@@ -90,19 +51,19 @@
         <div id="intruder-ui">
             <div style="color: #ff0000; font-size: 2em; font-weight: bold; margin-bottom: 20px;">⚠️ ALERTA DE INTRUSO</div>
             <div style="font-size: 4em; font-weight: bold; color: white;"><span id="timer-val">30</span>s</div>
-            <p style="color: #00ff41; margin-top: 20px;">IDENTIFICAR SUJETO:</p>
-            <input type="text" id="subject-name" placeholder="Nombre para BD..." style="font-size: 1.2em;">
+            <input type="text" id="subject-name" placeholder="Nombre para BD..." style="font-size: 1.2em; margin-top: 15px;">
             <br><br>
             <button onclick="saveSubject()" style="font-size: 1.2em;">AUTORIZAR Y GUARDAR</button>
         </div>
 
         <div class="ui-overlay top-left">
-            <div style="font-size: 1.5em;"><strong>GROWXPERT-IT NODE_01</strong></div>
+            <div style="font-size: 1.5em;"><strong>GROWXPERT-IT HD_NODE</strong></div>
             <div id="date">--/--/----</div>
             <div id="db-count" style="color: cyan; font-weight: bold;">[BD BIOMÉTRICA: 0 SUJETOS]</div>
+            <div id="user-count">VISORES: 0</div>
         </div>
         <div class="ui-overlay top-right">
-            <div class="blink-red" style="font-size: 1.2em;">● LIVE FEED</div>
+            <div class="blink-red" style="font-size: 1.2em;">● LIVE 720p</div>
             <div id="clock" style="font-size: 1.5em;">00:00:00</div>
         </div>
 
@@ -114,8 +75,8 @@
         <div id="status-bar">SISTEMA INICIALIZANDO MOTORES IA...</div>
 
         <div class="btn-panel">
-            <button id="btnTransmit" style="display:none;" onclick="startEverything()">▶ ACTIVAR SENSORES DUALES (PC)</button>
-            <button class="alarm" onclick="sendAlarm()">🚨 PÁNICO / ALARMA GLOBAL</button>
+            <button id="btnTransmit" style="display:none;" onclick="startEverything()">▶ ARMAR SENSORES DUALES (PC)</button>
+            <button class="alarm" onclick="sendAlarm()">🚨 ALARMA GLOBAL</button>
         </div>
     </div>
 
@@ -132,14 +93,22 @@
         
         let modelsLoaded = false;
         let cocoModel = null; 
+        
+        // Memoria Biométrica
         let knownFacesDB = []; 
         let faceMatcher = null; 
         let latestUnknownDescriptor = null; 
+        
+        // Variables de datos IA compartidas
+        let currentFaces = [];
+        let currentBodies = [];
+
+        // Temporizador
         let timerIntruso = null;
         let segundosRestantes = 30;
 
         function checkLogin() {
-            if(document.getElementById('user').value === 'admin' && document.getElementById('pass').value === 'GrowXpert1234') {
+            if(document.getElementById('pass').value === 'GrowXpert1234') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-ui').style.display = 'block';
                 loadModels();
@@ -147,8 +116,9 @@
         }
 
         async function loadModels() {
-            document.getElementById('status-bar').innerText = "CARGANDO REDES NEURONALES (Esto puede tardar unos segundos)...";
+            document.getElementById('status-bar').innerText = "CARGANDO REDES NEURONALES (Alta Precisión)...";
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            
             await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
@@ -161,108 +131,130 @@
         }
 
         async function startEverything() {
-            // Solicitamos una resolución un poco mayor si el hardware lo permite
+            // Forzamos resolución HD (1280x720)
             const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } });
             video.srcObject = stream;
             document.getElementById('btnTransmit').style.display = 'none';
-            document.getElementById('status-bar').innerText = "VIGILANCIA ACTIVA - TRANSMITIENDO";
+            document.getElementById('status-bar').innerText = "VIGILANCIA HD ACTIVA";
             
-            setInterval(async () => {
-                // Mantenemos la resolución interna en 640x480 para la IA, pero el canvas la estirará
-                vCanvas.width = aCanvas.width = 640;
-                vCanvas.height = aCanvas.height = 480;
-                vCtx.drawImage(video, 0, 0, 640, 480);
+            // Resolución interna de los Canvas para coincidir con el vídeo HD
+            video.addEventListener('loadedmetadata', () => {
+                vCanvas.width = aCanvas.width = 1280;
+                vCanvas.height = aCanvas.height = 720;
                 
-                let dataFaces = [];
-                let dataBodies = [];
+                // --- BUCLE 1: VÍDEO RÁPIDO Y FLUIDO (10 FPS) ---
+                setInterval(() => {
+                    vCtx.drawImage(video, 0, 0, 1280, 720);
+                    drawAI(currentFaces, currentBodies); // Dibuja la IA en el PC localmente
 
+                    socket.emit('streaming', {
+                        image: vCanvas.toDataURL('image/jpeg', 0.7), // Calidad 0.7 para mejor imagen
+                        faces: currentFaces,
+                        bodies: currentBodies
+                    });
+                }, 100);
+
+                // --- BUCLE 2: MOTOR DE INTELIGENCIA ARTIFICIAL (Más relajado) ---
                 if(modelsLoaded) {
-                    aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
+                    setInterval(async () => {
+                        // 1. Detección de Cuerpos
+                        const predictions = await cocoModel.detect(video);
+                        currentBodies = predictions
+                            .filter(p => p.class === 'person' && p.score > 0.5) // Solo personas seguras
+                            .map(p => ({ x: p.bbox[0], y: p.bbox[1], w: p.bbox[2], h: p.bbox[3] }));
 
-                    // Detección Cuerpos
-                    const predictions = await cocoModel.detect(video);
-                    predictions.forEach(pred => {
-                        if(pred.class === 'person') {
-                            const [x, y, w, h] = pred.bbox;
-                            aCtx.strokeStyle = "rgba(0, 170, 255, 0.6)"; aCtx.lineWidth = 4;
-                            aCtx.strokeRect(x, y, w, h);
-                            aCtx.fillStyle = "#00aaff"; aCtx.font = "bold 14px monospace";
-                            aCtx.fillText("HUMANO DETECTADO", x, y - 5);
-                            dataBodies.push({ x, y, w, h });
-                        }
-                    });
+                        // 2. Detección Facial
+                        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
+                            .withFaceLandmarks().withFaceDescriptors();
+                        
+                        const resizedDetections = faceapi.resizeResults(detections, { width: 1280, height: 720 });
+                        
+                        currentFaces = resizedDetections.map(d => {
+                            const box = d.detection.box;
+                            let label = "DESCONOCIDO";
+                            
+                            if (faceMatcher) {
+                                const match = faceMatcher.findBestMatch(d.descriptor);
+                                if (match.label !== "unknown") { label = match.label; } 
+                                else { latestUnknownDescriptor = d.descriptor; }
+                            } else { latestUnknownDescriptor = d.descriptor; }
 
-                    // Detección Facial
-                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
-                    const resizedDetections = faceapi.resizeResults(detections, { width: 640, height: 480 });
-                    resizedDetections.forEach(d => {
-                        const box = d.detection.box;
-                        let label = "DESCONOCIDO";
-                        let colorHex = "#ff0000";
-                        if (faceMatcher) {
-                            const match = faceMatcher.findBestMatch(d.descriptor);
-                            if (match.label !== "unknown") { label = match.label; colorHex = "#00ff41"; } 
-                            else { latestUnknownDescriptor = d.descriptor; }
-                        } else { latestUnknownDescriptor = d.descriptor; }
-
-                        aCtx.strokeStyle = colorHex; aCtx.lineWidth = 3;
-                        aCtx.strokeRect(box.x, box.y, box.width, box.height);
-                        aCtx.fillStyle = colorHex; aCtx.font = "bold 18px monospace";
-                        aCtx.fillText("ID: " + label, box.x, box.y - 12);
-                        dataFaces.push({ x: box.x, y: box.y, w: box.width, h: box.height, name: label });
-                    });
+                            return { x: box.x, y: box.y, w: box.width, h: box.height, name: label };
+                        });
+                    }, 400); // La IA procesa cada 400ms para no bloquear el vídeo
                 }
-
-                socket.emit('streaming', {
-                    image: vCanvas.toDataURL('image/jpeg', 0.5), // Calidad media para fluidez
-                    faces: dataFaces,
-                    bodies: dataBodies
-                });
-            }, 200); 
+            });
         }
 
-        socket.on('register-subject', (name) => {
-            if (latestUnknownDescriptor && !isMobile) {
-                const newProfile = new faceapi.LabeledFaceDescriptors(name.toUpperCase(), [latestUnknownDescriptor]);
-                knownFacesDB.push(newProfile);
-                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5);
-                document.getElementById('db-count').innerText = "[BD BIOMÉTRICA: " + knownFacesDB.length + " SUJETOS]";
-                latestUnknownDescriptor = null;
-            }
-        });
+        // Dibuja los cuadrados en el PC (Emisor)
+        function drawAI(faces, bodies) {
+            aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
+            
+            bodies.forEach(body => {
+                aCtx.strokeStyle = "rgba(0, 170, 255, 0.6)"; aCtx.lineWidth = 4;
+                aCtx.strokeRect(body.x, body.y, body.w, body.h);
+                aCtx.fillStyle = "#00aaff"; aCtx.font = "bold 18px monospace";
+                aCtx.fillText("HUMANO DETECTADO", body.x, body.y - 10);
+            });
 
+            faces.forEach(face => {
+                const colorHex = face.name !== "DESCONOCIDO" ? "#00ff41" : "#ff0000";
+                aCtx.strokeStyle = colorHex; aCtx.lineWidth = 4;
+                aCtx.strokeRect(face.x, face.y, face.w, face.h);
+                aCtx.fillStyle = colorHex; aCtx.font = "bold 22px monospace";
+                aCtx.fillText("ID: " + face.name, face.x, face.y - 15);
+            });
+        }
+
+        // --- LÓGICA DEL RECEPTOR (MÓVIL) ---
         socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
-                vCanvas.width = aCanvas.width = 640; 
-                vCanvas.height = aCanvas.height = 480;
+                vCanvas.width = aCanvas.width = 1280; 
+                vCanvas.height = aCanvas.height = 720;
                 vCtx.drawImage(img, 0, 0);
+                
                 aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
                 
                 let hayDesconocidos = false;
+
                 if(data.bodies) {
                     data.bodies.forEach(body => {
                         aCtx.strokeStyle = "rgba(0, 170, 255, 0.6)"; aCtx.lineWidth = 4;
                         aCtx.strokeRect(body.x, body.y, body.w, body.h);
-                        aCtx.fillStyle = "#00aaff"; aCtx.font = "bold 14px monospace";
-                        aCtx.fillText("HUMANO DETECTADO", body.x, body.y - 5);
+                        aCtx.fillStyle = "#00aaff"; aCtx.font = "bold 18px monospace";
+                        aCtx.fillText("HUMANO DETECTADO", body.x, body.y - 10);
                     });
                 }
+
                 if(data.faces) {
                     data.faces.forEach(face => {
                         const isKnown = face.name !== "DESCONOCIDO";
                         if(!isKnown) hayDesconocidos = true;
-                        aCtx.strokeStyle = isKnown ? "#00ff41" : "#ff0000"; aCtx.lineWidth = 3;
+
+                        aCtx.strokeStyle = isKnown ? "#00ff41" : "#ff0000"; aCtx.lineWidth = 4;
                         aCtx.strokeRect(face.x, face.y, face.w, face.h);
-                        aCtx.fillStyle = isKnown ? "#00ff41" : "#ff0000"; aCtx.font = "bold 18px monospace";
-                        aCtx.fillText("ID: " + face.name, face.x, face.y - 12);
+                        aCtx.fillStyle = isKnown ? "#00ff41" : "#ff0000"; aCtx.font = "bold 22px monospace";
+                        aCtx.fillText("ID: " + face.name, face.x, face.y - 15);
                     });
                 }
+
                 if (hayDesconocidos && isMobile) {
                     if (!timerIntruso) startIntruderTimer();
                 } else if (!hayDesconocidos) { resetIntruderTimer(); }
             };
             img.src = data.image; 
+        });
+
+        // --- SISTEMAS COMUNES (Móvil y PC) ---
+        socket.on('register-subject', (name) => {
+            if (latestUnknownDescriptor && !isMobile) {
+                const newProfile = new faceapi.LabeledFaceDescriptors(name.toUpperCase(), [latestUnknownDescriptor]);
+                knownFacesDB.push(newProfile);
+                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5); // 0.5 es la flexibilidad
+                document.getElementById('db-count').innerText = "[BD BIOMÉTRICA: " + knownFacesDB.length + " SUJETOS]";
+                latestUnknownDescriptor = null;
+            }
         });
 
         function startIntruderTimer() {
@@ -303,6 +295,8 @@
             document.body.style.background = "red";
             setTimeout(() => { osc.stop(); document.body.style.background = "black"; }, 3000);
         });
+
+        socket.on('user-count', c => document.getElementById('user-count').innerText = "VISORES: " + c);
 
         function updateClock() {
             setInterval(() => {
