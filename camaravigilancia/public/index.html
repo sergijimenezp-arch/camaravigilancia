@@ -3,227 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrowXpertIT - AI Security Suite</title>
+    <title>GrowXpertIT - AI Security Suite PRO</title>
     <script src="/socket.io/socket.io.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <style>
-        /* --- ESTÉTICA BASE GROWXPERT-IT --- */
-        body { margin: 0; background: #050505; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
+        body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
         
-        /* Pantalla de Login con estética industrial */
+        /* LOGIN SYSTEM */
         #login-screen { 
-            position: fixed; inset: 0; background: #000; z-index: 1000; 
+            position: fixed; inset: 0; background: #050505; z-index: 1000; 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            border: 20px solid #1a1a1a;
+            border: 10px solid #1a1a1a;
         }
-        #login-screen input { 
-            background: #000; border: 1px solid #00ff41; color: #00ff41; 
-            padding: 15px; margin: 10px; font-family: monospace; text-align: center;
-        }
+        .login-box { border: 1px solid #00ff41; padding: 40px; background: #000; text-align: center; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
+        input { background: #000; border: 1px solid #00ff41; color: #00ff41; padding: 12px; margin: 10px; font-family: monospace; outline: none; }
+        
+        /* MONITOR INTERFACE */
+        .monitor { position: relative; width: 100vw; height: 100vh; display: none; border: 15px solid #1a1a1a; box-sizing: border-box; }
+        .overlay-fx { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02)); background-size: 100% 4px, 3px 100%; z-index: 5; }
 
-        /* Monitor Principal */
-        .monitor { 
-            position: relative; width: 100vw; height: 100vh; display: none; 
-            border: 15px solid #1a1a1a; box-sizing: border-box;
-        }
+        #canvas-container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+        canvas { position: absolute; border: 1px solid #333; background: #000; width: 100%; height: 100%; object-fit: contain; }
 
-        /* Capa de Escaneado (Scanlines) */
-        .overlay-fx {
-            position: absolute; inset: 0; pointer-events: none;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
-            background-size: 100% 4px, 3px 100%; z-index: 5;
-        }
+        /* HUD */
+        .hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; padding: 25px; box-sizing: border-box; }
+        .top-left { position: absolute; top: 25px; left: 25px; border-left: 3px solid #00ff41; padding-left: 10px; }
+        .top-right { position: absolute; top: 25px; right: 40px; text-align: right; }
+        .bottom-center { position: absolute; bottom: 120px; width: 100%; text-align: center; left: 0; }
 
-        /* Contenedor de Video e IA */
-        #canvas-container { 
-            position: relative; width: 100%; height: 100%; 
-            display: flex; justify-content: center; align-items: center; 
-        }
-        canvas { position: absolute; max-width: 95%; max-height: 85%; border: 1px solid #333; }
+        /* INTRUDER ALERT */
+        #intruder-box { display: none; background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; padding: 15px; color: #ff0000; animation: pulse 0.8s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-        /* HUD: Textos y UI */
-        .hud { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; padding: 30px; box-sizing: border-box; }
-        .top-left { top: 0; left: 0; border-left: 3px solid #00ff41; padding-left: 15px; }
-        .top-right { top: 0; right: 40px; text-align: right; }
-        .bottom-center { bottom: 100px; left: 0; width: 100%; text-align: center; }
+        /* CONTROLS */
+        .ui-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 15px; pointer-events: all; z-index: 100; }
+        .btn { background: #00ff41; color: #000; border: none; padding: 12px 24px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-family: monospace; }
+        .btn-danger { background: #ff0000; color: #fff; }
+        .btn:hover { opacity: 0.8; }
 
-        /* Alerta de Intruso */
-        #intruder-ui { 
-            display: none; background: rgba(255, 0, 0, 0.2); 
-            border: 2px solid #ff0000; padding: 20px; color: #ff0000;
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
-
-        /* Controles Móviles Estéticos */
-        #mobile-controls { 
-            position: absolute; bottom: 0; width: 100%; background: #0a0a0a; 
-            border-top: 2px solid #333; padding: 20px; box-sizing: border-box; 
-            z-index: 20; display: none; text-align: center;
-        }
-        .btn { 
-            background: #00ff41; color: #000; border: none; padding: 12px 25px; 
-            font-weight: bold; cursor: pointer; text-transform: uppercase; margin: 5px;
-        }
-        .btn-danger { background: #ff0000; color: #fff; width: 100%; }
-
-        .rec-dot { color: #ff0000; animation: blink 1s infinite; font-weight: bold; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
+        .blink { animation: blinker 1s linear infinite; color: red; }
+        @keyframes blinker { 50% { opacity: 0; } }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="letter-spacing: 10px;">GROWXPERT-IT</h1>
-        <p>RESTRICTED ACCESS - BIOMETRIC SECURE LOGIN</p>
-        <input type="password" id="pass" placeholder="ENTER ACCESS CODE">
-        <button class="btn" onclick="login()">CONNECT TO NODE</button>
+        <div class="login-box">
+            <h2 style="letter-spacing: 5px;">GROWXPERT-IT SECURITY</h2>
+            <p style="font-size: 0.8em; color: #666;">ENCRYPTED TERMINAL v4.0</p>
+            <input type="text" id="user-input" placeholder="USERNAME"><br>
+            <input type="password" id="pass-input" placeholder="ACCESS CODE"><br>
+            <button class="btn" onclick="validateLogin()">INITIALIZE SYSTEM</button>
+        </div>
     </div>
 
     <div class="monitor" id="main-ui">
         <div class="overlay-fx"></div>
-        
         <div class="hud">
             <div class="top-left">
-                <div><strong>NODE: CAM-01 (MAIN)</strong></div>
-                <div id="date">--/--/----</div>
-                <div>SIGNAL: <span style="color: #00ff41;">SECURE</span></div>
+                <div style="font-size: 1.2em;"><strong>SISTEMA ARMADO: GROWXPERT-IT</strong></div>
+                <div id="date-display">--/--/----</div>
+                <div id="status-text">STATUS: <span style="color:yellow">STANDBY</span></div>
             </div>
             <div class="top-right">
-                <div class="rec-dot">● REC LIVE</div>
-                <div id="clock">00:00:00</div>
-                <div id="user-count">VISORS: 0</div>
+                <div class="blink">● LIVE FEED</div>
+                <div id="clock-display" style="font-size: 1.5em;">00:00:00</div>
+                <div id="visor-count">USERS: 0</div>
             </div>
             <div class="bottom-center">
-                <div id="intruder-ui">
-                    <div style="font-size: 1.2em;">⚠️ WARNING: UNKNOWN SUBJECT DETECTED</div>
-                    <div style="font-size: 2em;" id="timer">30</div>
-                    <div>SEC UNTIL AUTOMATIC ALARM</div>
+                <div id="intruder-box">
+                    <div style="font-size: 1.2em;">⚠️ INTRUSO NO IDENTIFICADO</div>
+                    <div style="font-size: 3em;" id="timer-display">30</div>
+                    <div>SEGUNDOS PARA ALARMA AUTOMÁTICA</div>
                 </div>
             </div>
         </div>
 
         <div id="canvas-container">
-            <canvas id="video-canvas"></canvas>
+            <canvas id="main-canvas"></canvas>
         </div>
 
-        <div style="position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 100;">
-            <button id="btnPC" class="btn" style="display:none;" onclick="startPC()">ACTIVATE LOCAL SENSORS</button>
-        </div>
-
-        <div id="mobile-controls">
-            <div id="input-zone" style="display:none; margin-bottom: 10px;">
-                <input type="text" id="face-name" placeholder="IDENTIFY SUBJECT..." style="background:#000; border:1px solid #00ff41; color:#00ff41; padding:10px;">
-                <button class="btn" onclick="identifyFace()">VALIDATE</button>
+        <div class="ui-panel">
+            <button id="btn-pc-start" class="btn" style="display:none" onclick="initCameraPC()">1. ARMAR SENSORES (PC)</button>
+            <div id="mobile-tools" style="display:none">
+                <input type="text" id="id-name" placeholder="NOMBRE SUJETO..." style="width:150px">
+                <button class="btn" onclick="authorizeSubject()">AUTORIZAR</button>
+                <button class="btn btn-danger" onclick="socket.emit('trigger-alarm')">🚨 ALARMA</button>
             </div>
-            <button class="btn btn-danger" onclick="socket.emit('trigger-alarm')">🚨 MANUAL OVERRIDE ALARM</button>
         </div>
     </div>
 
-    <video id="video" autoplay playsinline muted style="display:none;"></video>
+    <video id="v-source" autoplay playsinline muted style="display:none"></video>
 
     <script>
         const socket = io();
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        const vCanvas = document.getElementById('video-canvas');
-        const ctx = vCanvas.getContext('2d');
-        let intruderTimer = null;
-        let timeLeft = 30;
-        let faceKnown = false;
+        const canvas = document.getElementById('main-canvas');
+        const ctx = canvas.getContext('2d');
+        const video = document.getElementById('v-source');
+        
+        let intruderActive = false;
+        let countdown = null;
+        let seconds = 30;
+        let isAuthorized = false;
 
-        function login() {
-            if(document.getElementById('pass').value === 'GrowXpert1234') {
+        function validateLogin() {
+            const u = document.getElementById('user-input').value;
+            const p = document.getElementById('pass-input').value;
+            if(u === 'admin' && p === 'GrowXpert1234') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-ui').style.display = 'block';
-                if(isMobile) document.getElementById('mobile-controls').style.display = 'block';
-                else document.getElementById('btnPC').style.display = 'block';
-                loadIA();
-                updateClock();
-            } else { alert("ACCESS DENIED"); }
+                if(isMobile) document.getElementById('mobile-tools').style.display = 'block';
+                else document.getElementById('btn-pc-start').style.display = 'block';
+                setupSystem();
+            } else { alert("CREDENCIALES INVÁLIDAS"); }
         }
 
-        async function loadIA() {
-            const URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-            await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
+        async function setupSystem() {
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            document.getElementById('status-text').innerHTML = 'STATUS: <span style="color:#00ff41">READY</span>';
+            startTime();
         }
 
-        // --- LÓGICA EMISORA (PC) ---
-        async function startPC() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            document.getElementById('video').srcObject = stream;
-            document.getElementById('btnPC').style.display = 'none';
-            
-            setInterval(async () => {
-                vCanvas.width = 640; vCanvas.height = 480;
-                ctx.drawImage(document.getElementById('video'), 0, 0, 640, 480);
-                
-                const detections = await faceapi.detectAllFaces(document.getElementById('video'), new faceapi.TinyFaceDetectorOptions());
-                
-                socket.emit('streaming', {
-                    image: vCanvas.toDataURL('image/jpeg', 0.4),
-                    faces: detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }))
-                });
-            }, 150);
+        // --- LÓGICA EMISOR (PC) ---
+        async function initCameraPC() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                video.srcObject = stream;
+                document.getElementById('btn-pc-start').innerText = "SISTEMA ACTIVO";
+                document.getElementById('status-text').innerHTML = 'STATUS: <span style="color:#00ff41">TRANSMITTING</span>';
+
+                setInterval(async () => {
+                    canvas.width = 640; canvas.height = 480;
+                    ctx.drawImage(video, 0, 0, 640, 480);
+                    
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+                    
+                    socket.emit('streaming', {
+                        image: canvas.toDataURL('image/jpeg', 0.4),
+                        faces: detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }))
+                    });
+                }, 150);
+            } catch(e) { alert("Error cámara: " + e); }
         }
 
-        // --- LÓGICA RECEPTORA (MÓVIL / REMOTO) ---
+        // --- LÓGICA RECEPTOR (MOBILE/REMOTE) ---
         socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
-                vCanvas.width = 640; vCanvas.height = 480;
+                canvas.width = 640; canvas.height = 480;
                 ctx.drawImage(img, 0, 0);
                 
-                // Dibujar UI de IA sobre el video
                 data.faces.forEach(f => {
-                    ctx.strokeStyle = faceKnown ? "#00ff41" : "#ff0000";
+                    ctx.strokeStyle = isAuthorized ? "#00ff41" : "#ff0000";
                     ctx.lineWidth = 3;
                     ctx.strokeRect(f.x, f.y, f.w, f.h);
-                    
-                    ctx.fillStyle = faceKnown ? "#00ff41" : "#ff0000";
-                    ctx.font = "bold 14px monospace";
-                    ctx.fillText(faceKnown ? "AUTHORIZED" : "UNKNOWN SUBJECT", f.x, f.y - 10);
+                    ctx.fillStyle = isAuthorized ? "#00ff41" : "#ff0000";
+                    ctx.fillText(isAuthorized ? "AUTORIZADO" : "DESCONOCIDO", f.x, f.y - 10);
                 });
 
-                // Temporizador si hay caras y no están validadas
-                if(data.faces.length > 0 && !faceKnown && !intruderTimer) {
-                    startTimer();
-                } else if (data.faces.length === 0) {
-                    stopTimer();
-                }
+                if(data.faces.length > 0 && !isAuthorized && !intruderActive) startAlarmTimer();
+                else if(data.faces.length === 0) resetAlarmTimer();
             };
             img.src = data.image;
         });
 
-        function startTimer() {
-            timeLeft = 30;
-            document.getElementById('intruder-ui').style.display = 'block';
-            if(isMobile) document.getElementById('input-zone').style.display = 'block';
-            
-            intruderTimer = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').innerText = timeLeft;
-                if(timeLeft <= 0) {
+        function startAlarmTimer() {
+            intruderActive = true;
+            seconds = 30;
+            document.getElementById('intruder-box').style.display = 'block';
+            countdown = setInterval(() => {
+                seconds--;
+                document.getElementById('timer-display').innerText = seconds;
+                if(seconds <= 0) {
                     socket.emit('trigger-alarm');
-                    stopTimer();
+                    resetAlarmTimer();
                 }
             }, 1000);
         }
 
-        function stopTimer() {
-            clearInterval(intruderTimer);
-            intruderTimer = null;
-            document.getElementById('intruder-ui').style.display = 'none';
-            if(isMobile) document.getElementById('input-zone').style.display = 'none';
+        function resetAlarmTimer() {
+            clearInterval(countdown);
+            intruderActive = false;
+            document.getElementById('intruder-box').style.display = 'none';
         }
 
-        function identifyFace() {
-            const name = document.getElementById('face-name').value;
+        function authorizeSubject() {
+            const name = document.getElementById('id-name').value;
             if(name) {
-                faceKnown = true;
-                alert("Subject " + name + " authorized.");
-                stopTimer();
-                setTimeout(() => { faceKnown = false; }, 10000); // Se olvida tras 10s para pruebas
+                isAuthorized = true;
+                resetAlarmTimer();
+                document.getElementById('status-text').innerHTML = 'SUBJECT: ' + name;
+                setTimeout(() => { isAuthorized = false; }, 15000);
             }
         }
 
@@ -231,22 +203,21 @@
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.value = 880;
             osc.connect(audioCtx.destination);
             osc.start();
             document.body.style.background = "red";
-            setTimeout(() => { osc.stop(); document.body.style.background = "#050505"; }, 5000);
+            setTimeout(() => { osc.stop(); document.body.style.background = "#000"; }, 5000);
         });
 
-        socket.on('user-count', c => document.getElementById('user-count').innerText = "VISORS: " + c);
-
-        function updateClock() {
+        function startTime() {
             setInterval(() => {
                 const now = new Date();
-                document.getElementById('clock').innerText = now.toLocaleTimeString();
-                document.getElementById('date').innerText = now.toLocaleDateString();
+                document.getElementById('clock-display').innerText = now.toLocaleTimeString();
+                document.getElementById('date-display').innerText = now.toLocaleDateString();
             }, 1000);
         }
+        socket.on('user-count', c => document.getElementById('visor-count').innerText = "USERS: " + c);
     </script>
 </body>
 </html>
