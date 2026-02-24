@@ -6,30 +6,29 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-let connectedUsers = 0;
+let knownFaces = {}; // Guardaremos los nombres aquí
 
 io.on('connection', (socket) => {
-    connectedUsers++;
-    // Informar a todos cuánta gente hay conectada
-    io.emit('user-count', connectedUsers);
-
-    socket.on('streaming', (image) => {
-        socket.broadcast.emit('play-stream', image);
+    // Retransmitir video y datos
+    socket.on('streaming', (data) => {
+        socket.broadcast.emit('play-stream', data);
     });
 
-    // Lógica de la alarma
+    // Aprender un nuevo nombre desde el móvil
+    socket.on('learn-face', (name) => {
+        console.log("Nuevo sujeto identificado:", name);
+        io.emit('face-learned', name);
+    });
+
+    // Disparar alarma (manual o automática)
     socket.on('trigger-alarm', () => {
-        console.log("¡ALARMA ACTIVADA DESDE REMOTO!");
-        socket.broadcast.emit('action-alarm');
+        io.emit('action-alarm');
     });
 
-    socket.on('disconnect', () => {
-        connectedUsers--;
-        io.emit('user-count', connectedUsers);
-    });
+    socket.on('disconnect', () => { });
 });
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-    console.log(`GrowXpertIT Security Pro en puerto ${PORT}`);
+    console.log(`Servidor GrowXpertIT Pro activo`);
 });
