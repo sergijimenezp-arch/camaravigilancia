@@ -93,17 +93,11 @@
         
         let modelsLoaded = false;
         let cocoModel = null; 
-        
-        // Memoria Biométrica
         let knownFacesDB = []; 
         let faceMatcher = null; 
         let latestUnknownDescriptor = null; 
-        
-        // Variables de datos IA compartidas
         let currentFaces = [];
         let currentBodies = [];
-
-        // Temporizador
         let timerIntruso = null;
         let segundosRestantes = 30;
 
@@ -131,39 +125,46 @@
         }
 
         async function startEverything() {
-            // Forzamos resolución HD (1280x720)
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } });
+            // HACK HARDWARE: Solicitamos HD pero a un máximo de 15 FPS para ganar LUZ.
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 },
+                    frameRate: { ideal: 15, max: 20 }
+                } 
+            });
             video.srcObject = stream;
             document.getElementById('btnTransmit').style.display = 'none';
-            document.getElementById('status-bar').innerText = "VIGILANCIA HD ACTIVA";
+            document.getElementById('status-bar').innerText = "VIGILANCIA HD ACTIVA CON MEJORA DE BRILLO";
             
-            // Resolución interna de los Canvas para coincidir con el vídeo HD
             video.addEventListener('loadedmetadata', () => {
                 vCanvas.width = aCanvas.width = 1280;
                 vCanvas.height = aCanvas.height = 720;
                 
-                // --- BUCLE 1: VÍDEO RÁPIDO Y FLUIDO (10 FPS) ---
+                // BUCLE VÍDEO
                 setInterval(() => {
+                    // HACK SOFTWARE: Aumentamos brillo (+30%) y contraste (+15%)
+                    vCtx.filter = 'brightness(1.3) contrast(1.15)';
                     vCtx.drawImage(video, 0, 0, 1280, 720);
-                    drawAI(currentFaces, currentBodies); // Dibuja la IA en el PC localmente
+                    vCtx.filter = 'none'; // Reseteamos el filtro para no afectar a futuros dibujos
+                    
+                    drawAI(currentFaces, currentBodies); 
 
                     socket.emit('streaming', {
-                        image: vCanvas.toDataURL('image/jpeg', 0.7), // Calidad 0.7 para mejor imagen
+                        image: vCanvas.toDataURL('image/jpeg', 0.7),
                         faces: currentFaces,
                         bodies: currentBodies
                     });
                 }, 100);
 
-                // --- BUCLE 2: MOTOR DE INTELIGENCIA ARTIFICIAL (Más relajado) ---
+                // BUCLE IA
                 if(modelsLoaded) {
                     setInterval(async () => {
-                        // 1. Detección de Cuerpos
                         const predictions = await cocoModel.detect(video);
                         currentBodies = predictions
-                            .filter(p => p.class === 'person' && p.score > 0.5) // Solo personas seguras
+                            .filter(p => p.class === 'person' && p.score > 0.5) 
                             .map(p => ({ x: p.bbox[0], y: p.bbox[1], w: p.bbox[2], h: p.bbox[3] }));
 
-                        // 2. Detección Facial
                         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
                             .withFaceLandmarks().withFaceDescriptors();
                         
@@ -181,12 +182,11 @@
 
                             return { x: box.x, y: box.y, w: box.width, h: box.height, name: label };
                         });
-                    }, 400); // La IA procesa cada 400ms para no bloquear el vídeo
+                    }, 400); 
                 }
             });
         }
 
-        // Dibuja los cuadrados en el PC (Emisor)
         function drawAI(faces, bodies) {
             aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
             
@@ -212,8 +212,12 @@
             img.onload = () => {
                 vCanvas.width = aCanvas.width = 1280; 
                 vCanvas.height = aCanvas.height = 720;
-                vCtx.drawImage(img, 0, 0);
                 
+                // Aplicamos también un ligero brillo al móvil por si acaso la pantalla del móvil es oscura
+                vCtx.filter = 'brightness(1.1)';
+                vCtx.drawImage(img, 0, 0);
+                vCtx.filter = 'none';
+
                 aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
                 
                 let hayDesconocidos = false;
@@ -246,12 +250,11 @@
             img.src = data.image; 
         });
 
-        // --- SISTEMAS COMUNES (Móvil y PC) ---
         socket.on('register-subject', (name) => {
             if (latestUnknownDescriptor && !isMobile) {
                 const newProfile = new faceapi.LabeledFaceDescriptors(name.toUpperCase(), [latestUnknownDescriptor]);
                 knownFacesDB.push(newProfile);
-                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5); // 0.5 es la flexibilidad
+                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5); 
                 document.getElementById('db-count').innerText = "[BD BIOMÉTRICA: " + knownFacesDB.length + " SUJETOS]";
                 latestUnknownDescriptor = null;
             }
