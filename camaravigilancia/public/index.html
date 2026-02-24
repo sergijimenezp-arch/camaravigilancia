@@ -2,50 +2,123 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>GrowXpertIT - AI Intruder Detection</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrowXpertIT - AI Security Suite</title>
     <script src="/socket.io/socket.io.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <style>
-        body { margin: 0; background: #000; color: #00ff41; font-family: monospace; overflow: hidden; }
-        .monitor { position: relative; width: 100vw; height: 100vh; display: none; }
-        #canvas-container { position: relative; width: 100%; height: 70%; display: flex; justify-content: center; background: #000; }
-        canvas { position: absolute; width: 100%; max-width: 640px; }
+        /* --- ESTÉTICA BASE GROWXPERT-IT --- */
+        body { margin: 0; background: #050505; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
         
-        /* Panel de Control Móvil */
-        #mobile-controls { position: absolute; bottom: 0; width: 100%; height: 30%; background: #111; border-top: 2px solid #00ff41; padding: 15px; box-sizing: border-box; display: none; }
-        input { background: #000; border: 1px solid #00ff41; color: #00ff41; padding: 10px; width: 60%; }
-        
-        .timer-box { color: #ff0000; font-size: 1.5em; font-weight: bold; }
-        .alert-bg { animation: danger 0.5s infinite; }
-        @keyframes danger { 0% { background: #000; } 50% { background: #300; } }
+        /* Pantalla de Login con estética industrial */
+        #login-screen { 
+            position: fixed; inset: 0; background: #000; z-index: 1000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 20px solid #1a1a1a;
+        }
+        #login-screen input { 
+            background: #000; border: 1px solid #00ff41; color: #00ff41; 
+            padding: 15px; margin: 10px; font-family: monospace; text-align: center;
+        }
+
+        /* Monitor Principal */
+        .monitor { 
+            position: relative; width: 100vw; height: 100vh; display: none; 
+            border: 15px solid #1a1a1a; box-sizing: border-box;
+        }
+
+        /* Capa de Escaneado (Scanlines) */
+        .overlay-fx {
+            position: absolute; inset: 0; pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+            background-size: 100% 4px, 3px 100%; z-index: 5;
+        }
+
+        /* Contenedor de Video e IA */
+        #canvas-container { 
+            position: relative; width: 100%; height: 100%; 
+            display: flex; justify-content: center; align-items: center; 
+        }
+        canvas { position: absolute; max-width: 95%; max-height: 85%; border: 1px solid #333; }
+
+        /* HUD: Textos y UI */
+        .hud { position: absolute; width: 100%; height: 100%; pointer-events: none; z-index: 10; padding: 30px; box-sizing: border-box; }
+        .top-left { top: 0; left: 0; border-left: 3px solid #00ff41; padding-left: 15px; }
+        .top-right { top: 0; right: 40px; text-align: right; }
+        .bottom-center { bottom: 100px; left: 0; width: 100%; text-align: center; }
+
+        /* Alerta de Intruso */
+        #intruder-ui { 
+            display: none; background: rgba(255, 0, 0, 0.2); 
+            border: 2px solid #ff0000; padding: 20px; color: #ff0000;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Controles Móviles Estéticos */
+        #mobile-controls { 
+            position: absolute; bottom: 0; width: 100%; background: #0a0a0a; 
+            border-top: 2px solid #333; padding: 20px; box-sizing: border-box; 
+            z-index: 20; display: none; text-align: center;
+        }
+        .btn { 
+            background: #00ff41; color: #000; border: none; padding: 12px 25px; 
+            font-weight: bold; cursor: pointer; text-transform: uppercase; margin: 5px;
+        }
+        .btn-danger { background: #ff0000; color: #fff; width: 100%; }
+
+        .rec-dot { color: #ff0000; animation: blink 1s infinite; font-weight: bold; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } }
     </style>
 </head>
 <body>
 
-    <div id="login-screen" style="text-align:center; padding-top:100px;">
-        <h2>GROWXPERT-IT SECURITY</h2>
-        <input type="password" id="pass" placeholder="PASSWORD">
-        <button onclick="login()">ENTRAR</button>
+    <div id="login-screen">
+        <h1 style="letter-spacing: 10px;">GROWXPERT-IT</h1>
+        <p>RESTRICTED ACCESS - BIOMETRIC SECURE LOGIN</p>
+        <input type="password" id="pass" placeholder="ENTER ACCESS CODE">
+        <button class="btn" onclick="login()">CONNECT TO NODE</button>
     </div>
 
     <div class="monitor" id="main-ui">
+        <div class="overlay-fx"></div>
+        
+        <div class="hud">
+            <div class="top-left">
+                <div><strong>NODE: CAM-01 (MAIN)</strong></div>
+                <div id="date">--/--/----</div>
+                <div>SIGNAL: <span style="color: #00ff41;">SECURE</span></div>
+            </div>
+            <div class="top-right">
+                <div class="rec-dot">● REC LIVE</div>
+                <div id="clock">00:00:00</div>
+                <div id="user-count">VISORS: 0</div>
+            </div>
+            <div class="bottom-center">
+                <div id="intruder-ui">
+                    <div style="font-size: 1.2em;">⚠️ WARNING: UNKNOWN SUBJECT DETECTED</div>
+                    <div style="font-size: 2em;" id="timer">30</div>
+                    <div>SEC UNTIL AUTOMATIC ALARM</div>
+                </div>
+            </div>
+        </div>
+
         <div id="canvas-container">
             <canvas id="video-canvas"></canvas>
-            <canvas id="ai-canvas"></canvas>
         </div>
 
-        <div id="status-info" style="padding: 10px; text-align: center;">ESPERANDO SEÑAL...</div>
+        <div style="position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 100;">
+            <button id="btnPC" class="btn" style="display:none;" onclick="startPC()">ACTIVATE LOCAL SENSORS</button>
+        </div>
 
         <div id="mobile-controls">
-            <div id="intruder-alert" style="display:none;">
-                <div class="timer-box">⚠️ INTRUSO DETECTADO: <span id="timer">30</span>s</div>
-                <input type="text" id="face-name" placeholder="Nombre del sujeto...">
-                <button onclick="identifyFace()" style="background:#00ff41; color:#000; padding:10px;">IDENTIFICAR</button>
+            <div id="input-zone" style="display:none; margin-bottom: 10px;">
+                <input type="text" id="face-name" placeholder="IDENTIFY SUBJECT..." style="background:#000; border:1px solid #00ff41; color:#00ff41; padding:10px;">
+                <button class="btn" onclick="identifyFace()">VALIDATE</button>
             </div>
-            <button onclick="socket.emit('trigger-alarm')" style="background:red; color:white; width:100%; margin-top:10px; padding:15px;">🚨 ALARMA MANUAL</button>
+            <button class="btn btn-danger" onclick="socket.emit('trigger-alarm')">🚨 MANUAL OVERRIDE ALARM</button>
         </div>
-
-        <button id="btnPC" style="display:none; position:absolute; bottom:20px; left:50%; transform:translateX(-50%); padding:20px;" onclick="startPC()">INICIAR CÁMARA LOCAL</button>
     </div>
 
     <video id="video" autoplay playsinline muted style="display:none;"></video>
@@ -53,9 +126,11 @@
     <script>
         const socket = io();
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const vCanvas = document.getElementById('video-canvas');
+        const ctx = vCanvas.getContext('2d');
         let intruderTimer = null;
         let timeLeft = 30;
-        let currentSubjectRecognized = false;
+        let faceKnown = false;
 
         function login() {
             if(document.getElementById('pass').value === 'GrowXpert1234') {
@@ -64,23 +139,21 @@
                 if(isMobile) document.getElementById('mobile-controls').style.display = 'block';
                 else document.getElementById('btnPC').style.display = 'block';
                 loadIA();
-            }
+                updateClock();
+            } else { alert("ACCESS DENIED"); }
         }
 
         async function loadIA() {
             const URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
             await faceapi.nets.tinyFaceDetector.loadFromUri(URL);
-            document.getElementById('status-info').innerText = "IA LISTA";
         }
 
-        // Lógica del PC (Emisor)
+        // --- LÓGICA EMISORA (PC) ---
         async function startPC() {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             document.getElementById('video').srcObject = stream;
+            document.getElementById('btnPC').style.display = 'none';
             
-            const vCanvas = document.getElementById('video-canvas');
-            const ctx = vCanvas.getContext('2d');
-
             setInterval(async () => {
                 vCanvas.width = 640; vCanvas.height = 480;
                 ctx.drawImage(document.getElementById('video'), 0, 0, 640, 480);
@@ -89,79 +162,91 @@
                 
                 socket.emit('streaming', {
                     image: vCanvas.toDataURL('image/jpeg', 0.4),
-                    hasFace: detections.length > 0,
                     faces: detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }))
                 });
-            }, 200);
+            }, 150);
         }
 
-        // Lógica del Móvil (Receptor)
+        // --- LÓGICA RECEPTORA (MÓVIL / REMOTO) ---
         socket.on('play-stream', (data) => {
-            const vCanvas = document.getElementById('video-canvas');
-            const ctx = vCanvas.getContext('2d');
             const img = new Image();
             img.onload = () => {
                 vCanvas.width = 640; vCanvas.height = 480;
                 ctx.drawImage(img, 0, 0);
                 
-                // Dibujar cuadros
+                // Dibujar UI de IA sobre el video
                 data.faces.forEach(f => {
-                    ctx.strokeStyle = currentSubjectRecognized ? "#00ff41" : "#ff0000";
-                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = faceKnown ? "#00ff41" : "#ff0000";
+                    ctx.lineWidth = 3;
                     ctx.strokeRect(f.x, f.y, f.w, f.h);
+                    
+                    ctx.fillStyle = faceKnown ? "#00ff41" : "#ff0000";
+                    ctx.font = "bold 14px monospace";
+                    ctx.fillText(faceKnown ? "AUTHORIZED" : "UNKNOWN SUBJECT", f.x, f.y - 10);
                 });
+
+                // Temporizador si hay caras y no están validadas
+                if(data.faces.length > 0 && !faceKnown && !intruderTimer) {
+                    startTimer();
+                } else if (data.faces.length === 0) {
+                    stopTimer();
+                }
             };
             img.src = data.image;
-
-            // Manejo del Temporizador de Intrusos
-            if (data.hasFace && !currentSubjectRecognized && !intruderTimer) {
-                startIntruderCountdown();
-            } else if (!data.hasFace) {
-                resetIntruderSystem();
-            }
         });
 
-        function startIntruderCountdown() {
-            document.getElementById('intruder-alert').style.display = 'block';
-            document.body.classList.add('alert-bg');
+        function startTimer() {
             timeLeft = 30;
+            document.getElementById('intruder-ui').style.display = 'block';
+            if(isMobile) document.getElementById('input-zone').style.display = 'block';
+            
             intruderTimer = setInterval(() => {
                 timeLeft--;
                 document.getElementById('timer').innerText = timeLeft;
-                if (timeLeft <= 0) {
+                if(timeLeft <= 0) {
                     socket.emit('trigger-alarm');
-                    clearInterval(intruderTimer);
+                    stopTimer();
                 }
             }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(intruderTimer);
+            intruderTimer = null;
+            document.getElementById('intruder-ui').style.display = 'none';
+            if(isMobile) document.getElementById('input-zone').style.display = 'none';
         }
 
         function identifyFace() {
             const name = document.getElementById('face-name').value;
             if(name) {
-                currentSubjectRecognized = true;
-                socket.emit('learn-face', name);
-                resetIntruderSystem();
-                document.getElementById('status-info').innerText = "SUJETO AUTORIZADO: " + name;
+                faceKnown = true;
+                alert("Subject " + name + " authorized.");
+                stopTimer();
+                setTimeout(() => { faceKnown = false; }, 10000); // Se olvida tras 10s para pruebas
             }
         }
 
-        function resetIntruderSystem() {
-            clearInterval(intruderTimer);
-            intruderTimer = null;
-            document.getElementById('intruder-alert').style.display = 'none';
-            document.body.classList.remove('alert-bg');
-        }
-
-        // Alarma Sonora (Sintetizada)
         socket.on('action-alarm', () => {
-            const audioCtx = new AudioContext();
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
             osc.type = 'sawtooth';
-            osc.frequency.value = 440;
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
             osc.connect(audioCtx.destination);
             osc.start();
-            setTimeout(() => osc.stop(), 5000);
+            document.body.style.background = "red";
+            setTimeout(() => { osc.stop(); document.body.style.background = "#050505"; }, 5000);
         });
+
+        socket.on('user-count', c => document.getElementById('user-count').innerText = "VISORS: " + c);
+
+        function updateClock() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('clock').innerText = now.toLocaleTimeString();
+                document.getElementById('date').innerText = now.toLocaleDateString();
+            }, 1000);
+        }
     </script>
 </body>
 </html>
