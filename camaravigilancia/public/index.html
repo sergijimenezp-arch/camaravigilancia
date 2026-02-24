@@ -9,21 +9,24 @@
     <style>
         body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
         
-        /* LOGIN SYSTEM */
+        /* LOGIN */
         #login-screen { 
             position: fixed; inset: 0; background: #050505; z-index: 1000; 
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            border: 10px solid #1a1a1a;
         }
-        .login-box { border: 1px solid #00ff41; padding: 40px; background: #000; text-align: center; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
+        .login-box { border: 1px solid #00ff41; padding: 40px; background: #000; text-align: center; }
         input { background: #000; border: 1px solid #00ff41; color: #00ff41; padding: 12px; margin: 10px; font-family: monospace; outline: none; }
         
-        /* MONITOR INTERFACE */
+        /* MONITOR */
         .monitor { position: relative; width: 100vw; height: 100vh; display: none; border: 15px solid #1a1a1a; box-sizing: border-box; }
-        .overlay-fx { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02)); background-size: 100% 4px, 3px 100%; z-index: 5; }
-
-        #canvas-container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-        canvas { position: absolute; border: 1px solid #333; background: #000; width: 100%; height: 100%; object-fit: contain; }
+        #canvas-container { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; background: #000;}
+        
+        /* El Canvas es donde se ve la cámara */
+        canvas { 
+            width: 100%; height: 100%; 
+            object-fit: contain; /* Esto asegura que el video se vea bien en cualquier pantalla */
+            max-width: 1000px;
+        }
 
         /* HUD */
         .hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; padding: 25px; box-sizing: border-box; }
@@ -31,26 +34,23 @@
         .top-right { position: absolute; top: 25px; right: 40px; text-align: right; }
         .bottom-center { position: absolute; bottom: 120px; width: 100%; text-align: center; left: 0; }
 
-        /* INTRUDER ALERT */
-        #intruder-box { display: none; background: rgba(255, 0, 0, 0.2); border: 2px solid #ff0000; padding: 15px; color: #ff0000; animation: pulse 0.8s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        /* ALERTA */
+        #intruder-box { display: none; background: rgba(255, 0, 0, 0.4); border: 2px solid #ff0000; padding: 15px; color: #fff; animation: pulse 0.8s infinite; }
+        @keyframes pulse { 50% { opacity: 0.5; } }
 
-        /* CONTROLS */
+        /* CONTROLES */
         .ui-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 15px; pointer-events: all; z-index: 100; }
-        .btn { background: #00ff41; color: #000; border: none; padding: 12px 24px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-family: monospace; }
+        .btn { background: #00ff41; color: #000; border: none; padding: 12px 24px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         .btn-danger { background: #ff0000; color: #fff; }
-        .btn:hover { opacity: 0.8; }
 
-        .blink { animation: blinker 1s linear infinite; color: red; }
-        @keyframes blinker { 50% { opacity: 0; } }
+        #debug-msg { position: absolute; bottom: 5px; right: 5px; font-size: 8px; color: #333; }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
         <div class="login-box">
-            <h2 style="letter-spacing: 5px;">GROWXPERT-IT SECURITY</h2>
-            <p style="font-size: 0.8em; color: #666;">ENCRYPTED TERMINAL v4.0</p>
+            <h2>GROWXPERT-IT SECURITY</h2>
             <input type="text" id="user-input" placeholder="USERNAME"><br>
             <input type="password" id="pass-input" placeholder="ACCESS CODE"><br>
             <button class="btn" onclick="validateLogin()">INITIALIZE SYSTEM</button>
@@ -58,23 +58,20 @@
     </div>
 
     <div class="monitor" id="main-ui">
-        <div class="overlay-fx"></div>
         <div class="hud">
             <div class="top-left">
-                <div style="font-size: 1.2em;"><strong>SISTEMA ARMADO: GROWXPERT-IT</strong></div>
-                <div id="date-display">--/--/----</div>
-                <div id="status-text">STATUS: <span style="color:yellow">STANDBY</span></div>
+                <strong>GROWXPERT-IT NODE_01</strong><br>
+                <span id="date-display"></span><br>
+                <span id="status-text" style="color:yellow">STATUS: STANDBY</span>
             </div>
             <div class="top-right">
-                <div class="blink">● LIVE FEED</div>
-                <div id="clock-display" style="font-size: 1.5em;">00:00:00</div>
-                <div id="visor-count">USERS: 0</div>
+                <span style="color:red">● LIVE</span><br>
+                <span id="clock-display" style="font-size: 1.5em;"></span>
             </div>
             <div class="bottom-center">
                 <div id="intruder-box">
-                    <div style="font-size: 1.2em;">⚠️ INTRUSO NO IDENTIFICADO</div>
-                    <div style="font-size: 3em;" id="timer-display">30</div>
-                    <div>SEGUNDOS PARA ALARMA AUTOMÁTICA</div>
+                    ⚠️ INTRUSO DESCONOCIDO<br>
+                    <span id="timer-display" style="font-size: 3em;">30</span>s
                 </div>
             </div>
         </div>
@@ -84,13 +81,14 @@
         </div>
 
         <div class="ui-panel">
-            <button id="btn-pc-start" class="btn" style="display:none" onclick="initCameraPC()">1. ARMAR SENSORES (PC)</button>
+            <button id="btn-pc-start" class="btn" style="display:none" onclick="initCameraPC()">ARMAR SISTEMA (PC)</button>
             <div id="mobile-tools" style="display:none">
-                <input type="text" id="id-name" placeholder="NOMBRE SUJETO..." style="width:150px">
-                <button class="btn" onclick="authorizeSubject()">AUTORIZAR</button>
+                <input type="text" id="id-name" placeholder="NOMBRE...">
+                <button class="btn" onclick="authorizeSubject()">IDENTIFICAR</button>
                 <button class="btn btn-danger" onclick="socket.emit('trigger-alarm')">🚨 ALARMA</button>
             </div>
         </div>
+        <div id="debug-msg">GrowXpertIT_v4.2_Live_Active</div>
     </div>
 
     <video id="v-source" autoplay playsinline muted style="display:none"></video>
@@ -104,103 +102,99 @@
         
         let intruderActive = false;
         let countdown = null;
-        let seconds = 30;
         let isAuthorized = false;
+        let currentFaces = [];
 
         function validateLogin() {
-            const u = document.getElementById('user-input').value;
-            const p = document.getElementById('pass-input').value;
-            if(u === 'admin' && p === 'GrowXpert1234') {
+            if(document.getElementById('user-input').value === 'admin' && document.getElementById('pass-input').value === 'GrowXpert1234') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-ui').style.display = 'block';
-                if(isMobile) document.getElementById('mobile-tools').style.display = 'block';
-                else document.getElementById('btn-pc-start').style.display = 'block';
-                setupSystem();
-            } else { alert("CREDENCIALES INVÁLIDAS"); }
+                isMobile ? document.getElementById('mobile-tools').style.display = 'block' : document.getElementById('btn-pc-start').style.display = 'block';
+                setupIA();
+                setInterval(updateTime, 1000);
+            } else { alert("Error de acceso"); }
         }
 
-        async function setupSystem() {
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-            document.getElementById('status-text').innerHTML = 'STATUS: <span style="color:#00ff41">READY</span>';
-            startTime();
+        async function setupIA() {
+            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
+            document.getElementById('status-text').innerText = "STATUS: READY";
         }
 
-        // --- LÓGICA EMISOR (PC) ---
+        // --- EMISOR (EL PC QUE TIENE LA CÁMARA) ---
         async function initCameraPC() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
-                video.srcObject = stream;
-                document.getElementById('btn-pc-start').innerText = "SISTEMA ACTIVO";
-                document.getElementById('status-text').innerHTML = 'STATUS: <span style="color:#00ff41">TRANSMITTING</span>';
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            document.getElementById('btn-pc-start').style.display = 'none';
+            document.getElementById('status-text').innerText = "STATUS: TRANSMITTING";
 
-                setInterval(async () => {
-                    canvas.width = 640; canvas.height = 480;
-                    ctx.drawImage(video, 0, 0, 640, 480);
-                    
-                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
-                    
-                    socket.emit('streaming', {
-                        image: canvas.toDataURL('image/jpeg', 0.4),
-                        faces: detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }))
-                    });
-                }, 150);
-            } catch(e) { alert("Error cámara: " + e); }
+            // Bucle de transmisión
+            setInterval(async () => {
+                canvas.width = 640; canvas.height = 480;
+                ctx.drawImage(video, 0, 0, 640, 480); // Dibuja para el PC mismo
+                
+                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+                currentFaces = detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }));
+
+                // Dibujar cuadros localmente
+                drawUI(currentFaces);
+
+                socket.emit('streaming', {
+                    image: canvas.toDataURL('image/jpeg', 0.3),
+                    faces: currentFaces
+                });
+            }, 100);
         }
 
-        // --- LÓGICA RECEPTOR (MOBILE/REMOTE) ---
+        // --- RECEPTOR (EL MÓVIL QUE VE) ---
         socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
                 canvas.width = 640; canvas.height = 480;
-                ctx.drawImage(img, 0, 0);
+                ctx.drawImage(img, 0, 0); // Dibuja la imagen recibida
+                drawUI(data.faces); // Dibuja los cuadros de IA recibidos
                 
-                data.faces.forEach(f => {
-                    ctx.strokeStyle = isAuthorized ? "#00ff41" : "#ff0000";
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(f.x, f.y, f.w, f.h);
-                    ctx.fillStyle = isAuthorized ? "#00ff41" : "#ff0000";
-                    ctx.fillText(isAuthorized ? "AUTORIZADO" : "DESCONOCIDO", f.x, f.y - 10);
-                });
-
-                if(data.faces.length > 0 && !isAuthorized && !intruderActive) startAlarmTimer();
-                else if(data.faces.length === 0) resetAlarmTimer();
+                if(data.faces.length > 0 && !isAuthorized && !intruderActive) startTimer();
+                else if(data.faces.length === 0) stopTimer();
             };
             img.src = data.image;
         });
 
-        function startAlarmTimer() {
+        function drawUI(faces) {
+            faces.forEach(f => {
+                ctx.strokeStyle = isAuthorized ? "#00ff41" : "#ff0000";
+                ctx.lineWidth = 4;
+                ctx.strokeRect(f.x, f.y, f.w, f.h);
+                ctx.fillStyle = isAuthorized ? "#00ff41" : "#ff0000";
+                ctx.fillText(isAuthorized ? "IDENTIFICADO" : "DESCONOCIDO", f.x, f.y - 10);
+            });
+        }
+
+        // --- LÓGICA DE ALARMA ---
+        function startTimer() {
             intruderActive = true;
-            seconds = 30;
+            let s = 30;
             document.getElementById('intruder-box').style.display = 'block';
             countdown = setInterval(() => {
-                seconds--;
-                document.getElementById('timer-display').innerText = seconds;
-                if(seconds <= 0) {
-                    socket.emit('trigger-alarm');
-                    resetAlarmTimer();
-                }
+                s--;
+                document.getElementById('timer-display').innerText = s;
+                if(s <= 0) { socket.emit('trigger-alarm'); stopTimer(); }
             }, 1000);
         }
 
-        function resetAlarmTimer() {
+        function stopTimer() {
             clearInterval(countdown);
             intruderActive = false;
             document.getElementById('intruder-box').style.display = 'none';
         }
 
         function authorizeSubject() {
-            const name = document.getElementById('id-name').value;
-            if(name) {
-                isAuthorized = true;
-                resetAlarmTimer();
-                document.getElementById('status-text').innerHTML = 'SUBJECT: ' + name;
-                setTimeout(() => { isAuthorized = false; }, 15000);
-            }
+            isAuthorized = true;
+            stopTimer();
+            setTimeout(() => { isAuthorized = false; }, 10000);
         }
 
         socket.on('action-alarm', () => {
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audioCtx = new AudioContext();
             const osc = audioCtx.createOscillator();
             osc.type = 'sawtooth';
             osc.frequency.value = 880;
@@ -210,14 +204,11 @@
             setTimeout(() => { osc.stop(); document.body.style.background = "#000"; }, 5000);
         });
 
-        function startTime() {
-            setInterval(() => {
-                const now = new Date();
-                document.getElementById('clock-display').innerText = now.toLocaleTimeString();
-                document.getElementById('date-display').innerText = now.toLocaleDateString();
-            }, 1000);
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('clock-display').innerText = now.toLocaleTimeString();
+            document.getElementById('date-display').innerText = now.toLocaleDateString();
         }
-        socket.on('user-count', c => document.getElementById('visor-count').innerText = "USERS: " + c);
     </script>
 </body>
 </html>
