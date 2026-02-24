@@ -21,6 +21,13 @@
         button { background: #00ff41; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }
         button.alarm { background: #ff0000; color: #fff; }
         #status-bar { position: absolute; bottom: 80px; width: 100%; text-align: center; background: rgba(0,255,0,0.1); }
+        
+        /* AGREGADO: UI para identificar intrusos (Solo visible en móvil) */
+        #intruder-ui { 
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            background: rgba(0,0,0,0.9); padding: 20px; border: 2px solid #ff0000; z-index: 100; 
+            text-align: center; pointer-events: all; 
+        }
     </style>
 </head>
 <body>
@@ -33,10 +40,18 @@
     </div>
 
     <div class="monitor" id="main-ui">
+        
+        <div id="intruder-ui">
+            <div style="color: #ff0000; font-size: 1.5em; font-weight: bold;">⚠️ INTRUSO: <span id="timer-val">30</span>s</div>
+            <input type="text" id="subject-name" placeholder="Nombre del sujeto...">
+            <button onclick="saveSubject()">VALIDAR SUJETO</button>
+        </div>
+
         <div class="ui-overlay top-left">
             <div><strong>GROWXPERT-IT AI SYSTEM</strong></div>
             <div id="date">--/--/----</div>
             <div>USERS: <span id="user-count">0</span></div>
+            <div id="subject-info" style="color: yellow; margin-top: 10px;">SUJETO: DESCONOCIDO</div>
         </div>
         <div class="ui-overlay top-right">
             <div style="color: red; animation: blink 1s infinite;">● LIVE</div>
@@ -57,14 +72,22 @@
     </div>
 
     <video id="video" autoplay playsinline mute></video>
+    
     <script>
         const socket = io();
         const video = document.getElementById('video');
         const vCanvas = document.getElementById('video-canvas');
         const aCanvas = document.getElementById('ai-canvas');
         const vCtx = vCanvas.getContext('2d');
+        const aCtx = aCanvas.getContext('2d'); // Agregado para dibujar los cuadros en móvil
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
         let modelsLoaded = false;
+        
+        // AGREGADO: Variables para la lógica del intruso
+        let timerIntruso = null;
+        let segundosRestantes = 30;
+        let sujetoValidado = false;
 
         function checkLogin() {
             if(document.getElementById('user').value === 'admin' && document.getElementById('pass').value === 'GrowXpert1234') {
@@ -97,17 +120,25 @@
                 // Dibujar video
                 vCtx.drawImage(video, 0, 0, 640, 480);
                 
+                let dataFaces = []; // AGREGADO: Guardar coordenadas de las caras
+
                 // Detección IA
                 if(modelsLoaded) {
                     const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
                     const resizedDetections = faceapi.resizeResults(detections, { width: 640, height: 480 });
                     
-                    // Dibujar cuadrados
+                    // Dibujar cuadrados locales
                     faceapi.draw.drawDetections(aCanvas, resizedDetections);
+
+                    // Extraer coordenadas para enviar al móvil
+                    dataFaces = detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }));
                 }
 
-                // Enviar al servidor
-                socket.emit('streaming', vCanvas.toDataURL('image/jpeg', 0.5));
+                // Enviar al servidor (MODIFICADO para enviar imagen + caras)
+                socket.emit('streaming', {
+                    image: vCanvas.toDataURL('image/jpeg', 0.5),
+                    faces: dataFaces
+                });
             }, 100);
         }
 
@@ -136,15 +167,72 @@
             }, 3000);
         });
 
-        // --- RECIBIR STREAM (MÓVIL) ---
-        socket.on('play-stream', (imgData) => {
+        // --- RECIBIR STREAM (MÓVIL) (MODIFICADO para recibir caras) ---
+        socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
-                vCanvas.width = 640; vCanvas.height = 480;
+                vCanvas.width = aCanvas.width = 640; 
+                vCanvas.height = aCanvas.height = 480;
+                
+                // Dibujar la imagen
                 vCtx.drawImage(img, 0, 0);
+
+                // AGREGADO: Dibujar los cuadrados recibidos de la IA
+                aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
+                data.faces.forEach(face => {
+                    aCtx.strokeStyle = sujetoValidado ? "#00ff41" : "#ff0000";
+                    aCtx.lineWidth = 3;
+                    aCtx.strokeRect(face.x, face.y, face.w, face.h);
+                });
+
+                // AGREGADO: Lógica del temporizador de 30s
+                if (data.faces.length > 0 && !sujetoValidado && isMobile) {
+                    if (!timerIntruso) startIntruderTimer();
+                } else if (data.faces.length === 0) {
+                    resetIntruderTimer();
+                }
             };
-            img.src = imgData;
+            img.src = data.image; // Ahora data.image tiene el base64
         });
+
+        // AGREGADO: Funciones para manejar el temporizador y el nombre
+        function startIntruderTimer() {
+            document.getElementById('intruder-ui').style.display = 'block';
+            segundosRestantes = 30;
+            document.getElementById('timer-val').innerText = segundosRestantes;
+            
+            timerIntruso = setInterval(() => {
+                segundosRestantes--;
+                document.getElementById('timer-val').innerText = segundosRestantes;
+                if (segundosRestantes <= 0) {
+                    clearInterval(timerIntruso);
+                    sendAlarm();
+                }
+            }, 1000);
+        }
+
+        function resetIntruderTimer() {
+            clearInterval(timerIntruso);
+            timerIntruso = null;
+            document.getElementById('intruder-ui').style.display = 'none';
+            if(!sujetoValidado) {
+                document.getElementById('subject-info').innerText = "SUJETO: DESCONOCIDO";
+            }
+        }
+
+        function saveSubject() {
+            const name = document.getElementById('subject-name').value;
+            if (name) {
+                sujetoValidado = true;
+                clearInterval(timerIntruso);
+                document.getElementById('intruder-ui').style.display = 'none';
+                document.getElementById('subject-info').innerText = "SUJETO: " + name.toUpperCase();
+                document.getElementById('subject-name').value = ""; // Limpiar para el siguiente
+                
+                // El sujeto vuelve a ser desconocido después de 15 segundos para pruebas
+                setTimeout(() => { sujetoValidado = false; resetIntruderTimer(); }, 15000);
+            }
+        }
 
         socket.on('user-count', c => document.getElementById('user-count').innerText = c);
 
