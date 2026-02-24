@@ -29,7 +29,6 @@
         .btn-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 15px; pointer-events: all; z-index: 100; flex-wrap: wrap; }
         button { background: rgba(0, 255, 65, 0.8); color: #000; border: 1px solid #00ff41; padding: 15px 25px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
         button.alarm { background: rgba(255, 0, 0, 0.8); color: #fff; border: 1px solid #ff0000; }
-        button.night { background: rgba(0, 150, 255, 0.8); color: #fff; border: 1px solid #00aaff; }
 
         #status-bar { position: absolute; bottom: 90px; width: 100%; text-align: center; background: rgba(0,0,0,0.7); padding: 5px; z-index: 90; font-weight: bold; }
         
@@ -62,7 +61,6 @@
             <div id="date">--/--/----</div>
             <div id="db-count" style="color: cyan; font-weight: bold;">[BD BIOMÉTRICA: 0 SUJETOS]</div>
             <div id="user-count">VISORES: 0</div>
-            <div id="night-indicator" style="color: #00aaff; font-weight: bold; display:none;">🌙 MODO NOCTURNO ACTIVO</div>
         </div>
         <div class="ui-overlay top-right">
             <div class="blink-red" style="font-size: 1.2em;">● LIVE 720p</div>
@@ -78,7 +76,6 @@
 
         <div class="btn-panel">
             <button id="btnTransmit" style="display:none;" onclick="startEverything()">▶ ARMAR SENSORES DUALES (PC)</button>
-            <button id="btnNight" class="night" style="display:none;" onclick="toggleNightMode()">💡 LUZ NOCTURNA</button>
             <button class="alarm" onclick="sendAlarm()">🚨 ALARMA GLOBAL</button>
         </div>
     </div>
@@ -106,7 +103,6 @@
 
         let timerIntruso = null;
         let segundosRestantes = 30;
-        let isNightMode = false; // Control del Modo Nocturno
 
         function checkLogin() {
             if(document.getElementById('pass').value === 'GrowXpert1234') {
@@ -129,19 +125,15 @@
             document.getElementById('status-bar').innerText = "SISTEMA LISTO. IA EN ESPERA.";
             if(!isMobile) {
                 document.getElementById('btnTransmit').style.display = 'block';
-                document.getElementById('btnNight').style.display = 'block';
             }
             updateClock();
         }
 
-        // Activa/Desactiva el aumento de luz
-        function toggleNightMode() {
-            isNightMode = !isNightMode;
-            document.getElementById('night-indicator').style.display = isNightMode ? 'block' : 'none';
-        }
-
         async function startEverything() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } });
+            // Pedimos HD normal y dejamos que la cámara gestione su propia luz y FPS
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: { ideal: 1280 }, height: { ideal: 720 } } 
+            });
             video.srcObject = stream;
             document.getElementById('btnTransmit').style.display = 'none';
             document.getElementById('status-bar').innerText = "VIGILANCIA HD ACTIVA";
@@ -150,16 +142,10 @@
                 vCanvas.width = aCanvas.width = 1280;
                 vCanvas.height = aCanvas.height = 720;
                 
+                // BUCLE VÍDEO RÁPIDO Y LIMPIO
                 setInterval(() => {
-                    // --- MODO NOCTURNO: Aumenta brillo digitalmente si está activado ---
-                    if (isNightMode) {
-                        vCtx.filter = 'brightness(2.2) contrast(1.3) saturate(1.2)';
-                    } else {
-                        vCtx.filter = 'none';
-                    }
-                    
+                    // Dibujamos el frame tal cual, sin filtros artificiales
                     vCtx.drawImage(video, 0, 0, 1280, 720);
-                    vCtx.filter = 'none'; // Reseteamos
                     
                     drawAI(currentFaces, currentBodies); 
 
@@ -170,15 +156,14 @@
                     });
                 }, 100);
 
+                // BUCLE IA
                 if(modelsLoaded) {
                     setInterval(async () => {
-                        // COCO-SSD para cuerpos
                         const predictions = await cocoModel.detect(video);
                         currentBodies = predictions
                             .filter(p => p.class === 'person' && p.score > 0.5) 
                             .map(p => ({ x: p.bbox[0], y: p.bbox[1], w: p.bbox[2], h: p.bbox[3] }));
 
-                        // FaceAPI para caras
                         const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
                             .withFaceLandmarks().withFaceDescriptors();
                         
@@ -220,13 +205,16 @@
             });
         }
 
+        // --- LÓGICA DEL RECEPTOR (MÓVIL) ---
         socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
                 vCanvas.width = aCanvas.width = 1280; 
                 vCanvas.height = aCanvas.height = 720;
-                vCtx.drawImage(img, 0, 0);
                 
+                // Dibujamos la imagen recibida sin filtros adicionales
+                vCtx.drawImage(img, 0, 0);
+
                 aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
                 
                 let hayDesconocidos = false;
@@ -297,15 +285,12 @@
 
         function sendAlarm() { socket.emit('trigger-alarm'); }
 
-        // --- ALARMA 100% CORREGIDA ---
         socket.on('action-alarm', () => {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Forzamos el desbloqueo del audio si el navegador lo tenía dormido
                 if (audioCtx.state === 'suspended') { audioCtx.resume(); }
 
-                const osc = audioCtx.createOscillator(); // Aquí estaba el fallo tipográfico, ahora es osc
+                const osc = audioCtx.createOscillator(); 
                 const gain = audioCtx.createGain();
                 
                 osc.type = 'sawtooth'; 
