@@ -3,145 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrowXpertIT AI Security</title>
+    <title>GrowXpertIT AI Security Pro</title>
     <script src="/socket.io/socket.io.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <style>
         body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
-        
-        /* Login Overlay */
         #login-screen { position: fixed; inset: 0; background: #050505; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         input { background: #111; border: 1px solid #00ff41; color: #00ff41; padding: 10px; margin: 5px; outline: none; }
-        
-        /* Dashboard */
-        .monitor { position: relative; width: 100vw; height: 100vh; display: none; border: 15px solid #1a1a1a; box-sizing: border-box; }
-        #canvas-container { position: relative; width: 100%; height: 80%; display: flex; justify-content: center; align-items: center; }
-        #remote-view { max-width: 95%; max-height: 95%; border: 1px solid #333; }
-        canvas#ai-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
-
-        .ui-overlay { position: absolute; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; }
-        .top-left { top: 20px; left: 20px; }
-        .top-right { top: 20px; right: 40px; text-align: right; }
-        
-        .btn-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 20px; pointer-events: all; }
-        button { background: #00ff41; color: #000; border: none; padding: 12px 25px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .monitor { position: relative; width: 100vw; height: 100vh; display: none; }
+        #canvas-container { position: relative; width: 100%; height: 85%; display: flex; justify-content: center; align-items: center; background: #000; }
+        canvas { position: absolute; }
+        video { position: absolute; visibility: hidden; } /* Procesado en background */
+        .ui-overlay { position: absolute; width: 100%; height: 100%; pointer-events: none; padding: 20px; z-index: 10; }
+        .top-left { top: 0; left: 0; }
+        .top-right { top: 0; right: 0; text-align: right; padding-right: 40px; }
+        .btn-panel { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; pointer-events: all; z-index: 20; }
+        button { background: #00ff41; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }
         button.alarm { background: #ff0000; color: #fff; }
-        
-        .rec-dot { color: red; animation: blink 1s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        #status-bar { position: absolute; bottom: 80px; width: 100%; text-align: center; background: rgba(0,255,0,0.1); }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h2 style="letter-spacing: 5px;">GROWXPERT-IT SECURE ACCESS</h2>
+        <h2>GROWXPERT-IT SECURE ACCESS</h2>
         <input type="text" id="user" placeholder="USUARIO">
         <input type="password" id="pass" placeholder="CONTRASEÑA">
-        <button onclick="checkLogin()">CONECTAR</button>
+        <button onclick="checkLogin()">ACCEDER AL SISTEMA</button>
     </div>
 
     <div class="monitor" id="main-ui">
         <div class="ui-overlay top-left">
-            <div><strong>SISTEMA DE VIGILANCIA IA</strong></div>
+            <div><strong>GROWXPERT-IT AI SYSTEM</strong></div>
             <div id="date">--/--/----</div>
-            <div>VISORES: <span id="user-count">0</span></div>
+            <div>USERS: <span id="user-count">0</span></div>
         </div>
-
         <div class="ui-overlay top-right">
-            <div class="rec-dot">● REC LIVE</div>
+            <div style="color: red; animation: blink 1s infinite;">● LIVE</div>
             <div id="clock">00:00:00</div>
-            <div style="font-size: 0.8em; color: yellow;">IA: ACTIVE_FACE_DETECTION</div>
         </div>
 
         <div id="canvas-container">
-            <img id="remote-view" src="" />
-            <canvas id="ai-overlay"></canvas>
+            <canvas id="video-canvas"></canvas>
+            <canvas id="ai-canvas"></canvas>
         </div>
 
+        <div id="status-bar">SISTEMA INICIALIZANDO...</div>
+
         <div class="btn-panel">
-            <button id="btnTransmit" style="display: none;" onclick="startStream()">INICIAR TRANSMISIÓN PC</button>
-            <button class="alarm" onclick="sendAlarm()">ACTIVAR ALARMA</button>
+            <button id="btnTransmit" style="display:none;" onclick="startEverything()">1. ACTIVAR CÁMARA E IA</button>
+            <button class="alarm" onclick="sendAlarm()">⚠️ ACTIVAR ALARMA REMOTA</button>
         </div>
     </div>
 
-    <video id="video" autoplay playsinline style="display:none;"></video>
-    <audio id="alarmSound" src="https://www.soundjay.com/buttons/beep-01a.mp3" loop></audio>
-
+    <video id="video" autoplay playsinline mute></video>
     <script>
         const socket = io();
+        const video = document.getElementById('video');
+        const vCanvas = document.getElementById('video-canvas');
+        const aCanvas = document.getElementById('ai-canvas');
+        const vCtx = vCanvas.getContext('2d');
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        
-        // 1. Lógica de Login
+        let modelsLoaded = false;
+
         function checkLogin() {
-            const u = document.getElementById('user').value;
-            const p = document.getElementById('pass').value;
-            if(u === 'admin' && p === 'GrowXpert1234') {
+            if(document.getElementById('user').value === 'admin' && document.getElementById('pass').value === 'GrowXpert1234') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-ui').style.display = 'block';
-                initApp();
-            } else {
-                alert('ACCESO DENEGADO');
-            }
+                loadModels();
+            } else { alert('Acceso Denegado'); }
         }
 
-        async function initApp() {
-            // Solo PC puede ver botón de transmitir
-            if(!isMobile) {
-                document.getElementById('btnTransmit').style.display = 'block';
-            }
-            
-            // Cargar Modelos de IA
-            await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
-            updateTime();
+        async function loadModels() {
+            document.getElementById('status-bar').innerText = "CARGANDO MODELOS DE IA...";
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            modelsLoaded = true;
+            document.getElementById('status-bar').innerText = "SISTEMA LISTO";
+            if(!isMobile) document.getElementById('btnTransmit').style.display = 'block';
+            updateClock();
         }
 
-        // 2. Transmisión e IA (Solo para el PC emisor)
-        async function startStream() {
-            const video = document.getElementById('video');
+        async function startEverything() {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
-            
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const overlay = document.getElementById('ai-overlay');
+            document.getElementById('btnTransmit').innerText = "SISTEMA ARMADO Y TRANSMITIENDO";
             
             setInterval(async () => {
-                canvas.width = 640; canvas.height = 480;
-                ctx.drawImage(video, 0, 0, 640, 480);
+                // Ajustar tamaños
+                vCanvas.width = aCanvas.width = 640;
+                vCanvas.height = aCanvas.height = 480;
                 
-                // Detección de rostros
-                const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+                // Dibujar video
+                vCtx.drawImage(video, 0, 0, 640, 480);
                 
-                // Dibujar cuadrado de IA en el emisor (opcional) y enviar
-                const imageData = canvas.toDataURL('image/jpeg', 0.5);
-                socket.emit('streaming', imageData);
-            }, 150);
+                // Detección IA
+                if(modelsLoaded) {
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+                    const resizedDetections = faceapi.resizeResults(detections, { width: 640, height: 480 });
+                    
+                    // Dibujar cuadrados
+                    faceapi.draw.drawDetections(aCanvas, resizedDetections);
+                }
+
+                // Enviar al servidor
+                socket.emit('streaming', vCanvas.toDataURL('image/jpeg', 0.5));
+            }, 100);
         }
 
-        // 3. Recepción y Alarma
-        socket.on('play-stream', (img) => {
-            document.getElementById('remote-view').src = img;
-        });
-
-        socket.on('user-count', (count) => {
-            document.getElementById('user-count').innerText = count;
-        });
-
+        // --- SISTEMA DE ALARMA MEJORADO ---
         function sendAlarm() {
             socket.emit('trigger-alarm');
         }
 
         socket.on('action-alarm', () => {
-            const sound = document.getElementById('alarmSound');
-            sound.play();
+            // Generar sonido sintético (no depende de archivos externos)
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Tono de alarma
+            oscillator.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            oscillator.start();
             document.body.style.background = "red";
-            setTimeout(() => { 
+            
+            setTimeout(() => {
+                oscillator.stop();
                 document.body.style.background = "black";
-                sound.pause();
-            }, 5000);
+            }, 3000);
         });
 
-        function updateTime() {
+        // --- RECIBIR STREAM (MÓVIL) ---
+        socket.on('play-stream', (imgData) => {
+            const img = new Image();
+            img.onload = () => {
+                vCanvas.width = 640; vCanvas.height = 480;
+                vCtx.drawImage(img, 0, 0);
+            };
+            img.src = imgData;
+        });
+
+        socket.on('user-count', c => document.getElementById('user-count').innerText = c);
+
+        function updateClock() {
             setInterval(() => {
                 const now = new Date();
                 document.getElementById('clock').innerText = now.toLocaleTimeString();
