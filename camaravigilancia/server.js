@@ -1,8 +1,7 @@
 const express = require('express');
 const app = express();
 const http = require('http').Server(app);
-// Aumentamos el límite a 10MB para que el vídeo en Alta Calidad no se corte
-const io = require('socket.io')(http, { maxHttpBufferSize: 1e7 }); 
+const io = require('socket.io')(http, { maxHttpBufferSize: 1e7 }); // Soporte HD
 const path = require('path');
 
 const publicPath = path.join(__dirname, 'public');
@@ -19,20 +18,17 @@ io.on('connection', (socket) => {
     io.emit('user-count', connectedUsers);
     console.log(`[GrowXpertIT] Visores online: ${connectedUsers}`);
 
-    // Reenviar vídeo HD e Inteligencia Artificial
     socket.on('streaming', (data) => {
         socket.broadcast.emit('play-stream', data);
     });
 
-    // Memoria Biométrica
     socket.on('learn-subject', (name) => {
         console.log(`[GrowXpertIT] Sujeto autorizado: ${name}`);
         io.emit('register-subject', name);
     });
 
-    // Alarma Global
     socket.on('trigger-alarm', () => {
-        console.log("[GrowXpertIT] ⚠️ ALARMA ACTIVADA");
+        console.log("[GrowXpertIT] ⚠️ ALARMA ACTIVADA DESDE INTERFAZ");
         io.emit('action-alarm');
     });
 
