@@ -2,69 +2,65 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GrowXpertIT HD AI SECURITY</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrowXpertIT BIOMETRIC + BODY TRACKING</title>
     <script src="/socket.io/socket.io.js"></script>
     
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
 
     <style>
         body { margin: 0; background: #000; color: #00ff41; font-family: 'Courier New', monospace; overflow: hidden; }
-        
-        #login-screen { position: fixed; inset: 0; background: #050505; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px solid #00ff41; }
-        input { background: #111; border: 1px solid #00ff41; color: #00ff41; padding: 12px; margin: 5px; outline: none; text-align: center; }
-        
+        #login-screen { position: fixed; inset: 0; background: #050505; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { background: #111; border: 1px solid #00ff41; color: #00ff41; padding: 10px; margin: 5px; outline: none; }
         .monitor { position: relative; width: 100vw; height: 100vh; display: none; }
         
+        /* CAMBIO APLICADO: Contenedor y Canvas a pantalla completa */
         #canvas-container { position: relative; width: 100%; height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; }
         canvas { position: absolute; width: 100%; height: 100%; object-fit: contain; }
+        
         video { position: absolute; visibility: hidden; } 
-
-        .ui-overlay { position: absolute; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; z-index: 10; }
-        .top-left { top: 0; left: 0; border-left: 4px solid #00ff41; padding-left: 15px; background: rgba(0,0,0,0.5); }
-        .top-right { top: 0; right: 0; text-align: right; background: rgba(0,0,0,0.5); padding-right: 15px;}
+        .ui-overlay { position: absolute; width: 100%; height: 100%; pointer-events: none; padding: 20px; z-index: 10; box-sizing: border-box; }
+        .top-left { top: 0; left: 0; border-left: 2px solid #00ff41; padding-left:10px; }
+        .top-right { top: 0; right: 0; text-align: right; padding-right: 40px; }
+        .btn-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 10px; pointer-events: all; z-index: 20; }
+        button { background: #00ff41; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }
+        button.alarm { background: #ff0000; color: #fff; }
+        #status-bar { position: absolute; bottom: 80px; width: 100%; text-align: center; background: rgba(0,0,0,0.5); padding: 5px; z-index: 90; }
         
-        .btn-panel { position: absolute; bottom: 30px; width: 100%; display: flex; justify-content: center; gap: 15px; pointer-events: all; z-index: 100; flex-wrap: wrap; }
-        button { background: rgba(0, 255, 65, 0.8); color: #000; border: 1px solid #00ff41; padding: 15px 25px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        button.alarm { background: rgba(255, 0, 0, 0.8); color: #fff; border: 1px solid #ff0000; }
-
-        #status-bar { position: absolute; bottom: 90px; width: 100%; text-align: center; background: rgba(0,0,0,0.7); padding: 5px; z-index: 90; font-weight: bold; }
-        
-        #intruder-ui { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 30px; border: 3px solid #ff0000; z-index: 200; text-align: center; pointer-events: all; box-shadow: 0 0 30px #ff0000; }
-        .blink-red { animation: blink 1s infinite; color: red; }
-        @keyframes blink { 50% { opacity: 0; } }
+        #intruder-ui { 
+            display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            background: rgba(0,0,0,0.9); padding: 20px; border: 2px solid #ff0000; z-index: 100; text-align: center; pointer-events: all; 
+        }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h1 style="letter-spacing: 5px;">GROWXPERT-IT</h1>
-        <h3>HD BIOMETRIC SYSTEM</h3>
-        <input type="password" id="pass" placeholder="CÓDIGO DE ACCESO">
-        <button onclick="checkLogin()" style="margin-top: 20px;">INICIAR TERMINAL</button>
+        <h2>GROWXPERT-IT SECURE BIOMETRICS</h2>
+        <input type="text" id="user" placeholder="USUARIO">
+        <input type="password" id="pass" placeholder="CONTRASEÑA">
+        <button onclick="checkLogin()">ACCEDER</button>
     </div>
 
     <div class="monitor" id="main-ui">
         
         <div id="intruder-ui">
-            <div style="color: #ff0000; font-size: 2em; font-weight: bold; margin-bottom: 20px;">⚠️ ALERTA DE INTRUSO</div>
-            <div style="font-size: 4em; font-weight: bold; color: white;"><span id="timer-val">30</span>s</div>
-            <input type="text" id="subject-name" placeholder="Nombre para BD..." style="font-size: 1.2em; margin-top: 15px;">
-            <br><br>
-            <button onclick="saveSubject()" style="font-size: 1.2em;">AUTORIZAR Y GUARDAR</button>
+            <div style="color: #ff0000; font-size: 1.5em; font-weight: bold;">⚠️ INTRUSO: <span id="timer-val">30</span>s</div>
+            <input type="text" id="subject-name" placeholder="Nombre para BD...">
+            <button onclick="saveSubject()">GUARDAR EN MEMORIA</button>
         </div>
 
         <div class="ui-overlay top-left">
-            <div style="font-size: 1.5em;"><strong>GROWXPERT-IT HD_NODE</strong></div>
+            <div><strong>GROWXPERT-IT AI SYSTEM</strong></div>
             <div id="date">--/--/----</div>
-            <div id="db-count" style="color: cyan; font-weight: bold;">[BD BIOMÉTRICA: 0 SUJETOS]</div>
-            <div id="user-count">VISORES: 0</div>
+            <div id="db-count" style="color: cyan;">BASE DE DATOS: 0 SUJETOS</div>
         </div>
         <div class="ui-overlay top-right">
-            <div class="blink-red" style="font-size: 1.2em;">● LIVE 720p</div>
-            <div id="clock" style="font-size: 1.5em;">00:00:00</div>
+            <div style="color: red; animation: blink 1s infinite;">● REC</div>
+            <div id="clock">00:00:00</div>
         </div>
 
         <div id="canvas-container">
@@ -72,10 +68,10 @@
             <canvas id="ai-canvas"></canvas>
         </div>
 
-        <div id="status-bar">SISTEMA INICIALIZANDO MOTORES IA...</div>
+        <div id="status-bar">SISTEMA INICIALIZANDO...</div>
 
         <div class="btn-panel">
-            <button id="btnTransmit" style="display:none;" onclick="startEverything()">▶ ARMAR SENSORES DUALES (PC)</button>
+            <button id="btnTransmit" style="display:none;" onclick="startEverything()">1. ACTIVAR SENSORES DUALES (PC)</button>
             <button class="alarm" onclick="sendAlarm()">🚨 ALARMA GLOBAL</button>
         </div>
     </div>
@@ -94,125 +90,130 @@
         let modelsLoaded = false;
         let cocoModel = null; 
         
+        // --- MEMORIA BIOMÉTRICA ---
         let knownFacesDB = []; 
         let faceMatcher = null; 
         let latestUnknownDescriptor = null; 
         
-        let currentFaces = [];
-        let currentBodies = [];
-
+        // --- TEMPORIZADOR ---
         let timerIntruso = null;
         let segundosRestantes = 30;
 
         function checkLogin() {
-            if(document.getElementById('pass').value === 'GrowXpert1234') {
+            if(document.getElementById('user').value === 'admin' && document.getElementById('pass').value === 'GrowXpert1234') {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-ui').style.display = 'block';
                 loadModels();
-            } else { alert('ACCESO DENEGADO'); }
+            } else { alert('Acceso Denegado'); }
         }
 
         async function loadModels() {
-            document.getElementById('status-bar').innerText = "CARGANDO REDES NEURONALES (Alta Precisión)...";
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            document.getElementById('status-bar').innerText = "CARGANDO REDES NEURONALES DUALES (PUEDE TARDAR)...";
             
+            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
             await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
             await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
             await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            
             cocoModel = await cocoSsd.load();
             
             modelsLoaded = true;
-            document.getElementById('status-bar').innerText = "SISTEMA LISTO. IA EN ESPERA.";
-            if(!isMobile) {
-                document.getElementById('btnTransmit').style.display = 'block';
-            }
+            document.getElementById('status-bar').innerText = "SISTEMA LISTO. MOTORES DE IA ACTIVADOS.";
+            if(!isMobile) document.getElementById('btnTransmit').style.display = 'block';
             updateClock();
         }
 
         async function startEverything() {
-            // Pedimos HD normal y dejamos que la cámara gestione su propia luz y FPS
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: { ideal: 1280 }, height: { ideal: 720 } } 
-            });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
             document.getElementById('btnTransmit').style.display = 'none';
-            document.getElementById('status-bar').innerText = "VIGILANCIA HD ACTIVA";
+            document.getElementById('status-bar').innerText = "VIGILANCIA EN CURSO...";
             
-            video.addEventListener('loadedmetadata', () => {
-                vCanvas.width = aCanvas.width = 1280;
-                vCanvas.height = aCanvas.height = 720;
+            setInterval(async () => {
+                vCanvas.width = aCanvas.width = 640;
+                vCanvas.height = aCanvas.height = 480;
+                vCtx.drawImage(video, 0, 0, 640, 480);
                 
-                // BUCLE VÍDEO RÁPIDO Y LIMPIO
-                setInterval(() => {
-                    // Dibujamos el frame tal cual, sin filtros artificiales
-                    vCtx.drawImage(video, 0, 0, 1280, 720);
-                    
-                    drawAI(currentFaces, currentBodies); 
+                let dataFaces = [];
+                let dataBodies = [];
 
-                    socket.emit('streaming', {
-                        image: vCanvas.toDataURL('image/jpeg', 0.7),
-                        faces: currentFaces,
-                        bodies: currentBodies
-                    });
-                }, 100);
-
-                // BUCLE IA
                 if(modelsLoaded) {
-                    setInterval(async () => {
-                        const predictions = await cocoModel.detect(video);
-                        currentBodies = predictions
-                            .filter(p => p.class === 'person' && p.score > 0.5) 
-                            .map(p => ({ x: p.bbox[0], y: p.bbox[1], w: p.bbox[2], h: p.bbox[3] }));
+                    aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
 
-                        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }))
-                            .withFaceLandmarks().withFaceDescriptors();
-                        
-                        const resizedDetections = faceapi.resizeResults(detections, { width: 1280, height: 720 });
-                        
-                        currentFaces = resizedDetections.map(d => {
-                            const box = d.detection.box;
-                            let label = "DESCONOCIDO";
-                            
-                            if (faceMatcher) {
-                                const match = faceMatcher.findBestMatch(d.descriptor);
-                                if (match.label !== "unknown") { label = match.label; } 
-                                else { latestUnknownDescriptor = d.descriptor; }
-                            } else { latestUnknownDescriptor = d.descriptor; }
+                    // --- 1. DETECCIÓN DE CUERPOS ---
+                    const predictions = await cocoModel.detect(video);
+                    predictions.forEach(pred => {
+                        if(pred.class === 'person') {
+                            const [x, y, w, h] = pred.bbox;
+                            aCtx.strokeStyle = "#00aaff";
+                            aCtx.lineWidth = 2;
+                            aCtx.strokeRect(x, y, w, h);
+                            aCtx.fillStyle = "#00aaff";
+                            aCtx.font = "bold 14px monospace";
+                            aCtx.fillText("HUMANO (" + Math.round(pred.score * 100) + "% exactitud)", x, y - 5);
+                            dataBodies.push({ x, y, w, h });
+                        }
+                    });
 
-                            return { x: box.x, y: box.y, w: box.width, h: box.height, name: label };
-                        });
-                    }, 400); 
+                    // --- 2. DETECCIÓN FACIAL Y MEMORIA ---
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+                    
+                    const resizedDetections = faceapi.resizeResults(detections, { width: 640, height: 480 });
+
+                    resizedDetections.forEach(d => {
+                        const box = d.detection.box;
+                        let label = "DESCONOCIDO";
+                        let colorHex = "#ff0000"; 
+
+                        if (faceMatcher) {
+                            const match = faceMatcher.findBestMatch(d.descriptor);
+                            if (match.label !== "unknown") {
+                                label = match.label;
+                                colorHex = "#00ff41"; 
+                            } else {
+                                latestUnknownDescriptor = d.descriptor; 
+                            }
+                        } else {
+                            latestUnknownDescriptor = d.descriptor;
+                        }
+
+                        aCtx.strokeStyle = colorHex;
+                        aCtx.lineWidth = 3;
+                        aCtx.strokeRect(box.x, box.y, box.width, box.height);
+                        aCtx.fillStyle = colorHex;
+                        aCtx.font = "bold 16px monospace";
+                        aCtx.fillText("ID: " + label, box.x, box.y - 10);
+
+                        dataFaces.push({ x: box.x, y: box.y, w: box.width, h: box.height, name: label });
+                    });
                 }
-            });
+
+                socket.emit('streaming', {
+                    image: vCanvas.toDataURL('image/jpeg', 0.4),
+                    faces: dataFaces,
+                    bodies: dataBodies
+                });
+            }, 200); 
         }
 
-        function drawAI(faces, bodies) {
-            aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
-            
-            bodies.forEach(body => {
-                aCtx.strokeStyle = "rgba(0, 170, 255, 0.6)"; aCtx.lineWidth = 4;
-                aCtx.strokeRect(body.x, body.y, body.w, body.h);
-                aCtx.fillStyle = "#00aaff"; aCtx.font = "bold 18px monospace";
-                aCtx.fillText("HUMANO DETECTADO", body.x, body.y - 10);
-            });
+        socket.on('register-subject', (name) => {
+            if (latestUnknownDescriptor && !isMobile) {
+                const newProfile = new faceapi.LabeledFaceDescriptors(name.toUpperCase(), [latestUnknownDescriptor]);
+                knownFacesDB.push(newProfile);
+                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5);
+                
+                document.getElementById('db-count').innerText = "BASE DE DATOS: " + knownFacesDB.length + " SUJETOS";
+                latestUnknownDescriptor = null;
+            }
+        });
 
-            faces.forEach(face => {
-                const colorHex = face.name !== "DESCONOCIDO" ? "#00ff41" : "#ff0000";
-                aCtx.strokeStyle = colorHex; aCtx.lineWidth = 4;
-                aCtx.strokeRect(face.x, face.y, face.w, face.h);
-                aCtx.fillStyle = colorHex; aCtx.font = "bold 22px monospace";
-                aCtx.fillText("ID: " + face.name, face.x, face.y - 15);
-            });
-        }
-
-        // --- LÓGICA DEL RECEPTOR (MÓVIL) ---
         socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
-                vCanvas.width = aCanvas.width = 1280; 
-                vCanvas.height = aCanvas.height = 720;
-                
-                // Dibujamos la imagen recibida sin filtros adicionales
+                vCanvas.width = aCanvas.width = 640; 
+                vCanvas.height = aCanvas.height = 480;
                 vCtx.drawImage(img, 0, 0);
 
                 aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
@@ -221,10 +222,11 @@
 
                 if(data.bodies) {
                     data.bodies.forEach(body => {
-                        aCtx.strokeStyle = "rgba(0, 170, 255, 0.6)"; aCtx.lineWidth = 4;
+                        aCtx.strokeStyle = "#00aaff"; 
+                        aCtx.lineWidth = 2;
                         aCtx.strokeRect(body.x, body.y, body.w, body.h);
-                        aCtx.fillStyle = "#00aaff"; aCtx.font = "bold 18px monospace";
-                        aCtx.fillText("HUMANO DETECTADO", body.x, body.y - 10);
+                        aCtx.fillStyle = "#00aaff";
+                        aCtx.fillText("HUMANO DETECTADO", body.x, body.y - 5);
                     });
                 }
 
@@ -233,38 +235,37 @@
                         const isKnown = face.name !== "DESCONOCIDO";
                         if(!isKnown) hayDesconocidos = true;
 
-                        aCtx.strokeStyle = isKnown ? "#00ff41" : "#ff0000"; aCtx.lineWidth = 4;
+                        aCtx.strokeStyle = isKnown ? "#00ff41" : "#ff0000";
+                        aCtx.lineWidth = 3;
                         aCtx.strokeRect(face.x, face.y, face.w, face.h);
-                        aCtx.fillStyle = isKnown ? "#00ff41" : "#ff0000"; aCtx.font = "bold 22px monospace";
-                        aCtx.fillText("ID: " + face.name, face.x, face.y - 15);
+                        
+                        aCtx.fillStyle = isKnown ? "#00ff41" : "#ff0000";
+                        aCtx.font = "bold 16px monospace";
+                        aCtx.fillText("ID: " + face.name, face.x, face.y - 10);
                     });
                 }
 
                 if (hayDesconocidos && isMobile) {
                     if (!timerIntruso) startIntruderTimer();
-                } else if (!hayDesconocidos) { resetIntruderTimer(); }
+                } else if (!hayDesconocidos) {
+                    resetIntruderTimer();
+                }
             };
             img.src = data.image; 
-        });
-
-        socket.on('register-subject', (name) => {
-            if (latestUnknownDescriptor && !isMobile) {
-                const newProfile = new faceapi.LabeledFaceDescriptors(name.toUpperCase(), [latestUnknownDescriptor]);
-                knownFacesDB.push(newProfile);
-                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5); 
-                document.getElementById('db-count').innerText = "[BD BIOMÉTRICA: " + knownFacesDB.length + " SUJETOS]";
-                latestUnknownDescriptor = null;
-            }
         });
 
         function startIntruderTimer() {
             document.getElementById('intruder-ui').style.display = 'block';
             segundosRestantes = 30;
             document.getElementById('timer-val').innerText = segundosRestantes;
+            
             timerIntruso = setInterval(() => {
                 segundosRestantes--;
                 document.getElementById('timer-val').innerText = segundosRestantes;
-                if (segundosRestantes <= 0) { clearInterval(timerIntruso); sendAlarm(); }
+                if (segundosRestantes <= 0) {
+                    clearInterval(timerIntruso);
+                    sendAlarm();
+                }
             }, 1000);
         }
 
@@ -286,32 +287,16 @@
         function sendAlarm() { socket.emit('trigger-alarm'); }
 
         socket.on('action-alarm', () => {
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                if (audioCtx.state === 'suspended') { audioCtx.resume(); }
-
-                const osc = audioCtx.createOscillator(); 
-                const gain = audioCtx.createGain();
-                
-                osc.type = 'sawtooth'; 
-                osc.frequency.setValueAtTime(880, audioCtx.currentTime); 
-                
-                osc.connect(gain); 
-                gain.connect(audioCtx.destination);
-                
-                osc.start();
-                document.body.style.background = "red";
-                
-                setTimeout(() => { 
-                    osc.stop(); 
-                    document.body.style.background = "#000"; 
-                }, 3000);
-            } catch(e) {
-                console.log("Error de audio: ", e);
-            }
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start();
+            document.body.style.background = "red";
+            setTimeout(() => { osc.stop(); document.body.style.background = "black"; }, 3000);
         });
-
-        socket.on('user-count', c => document.getElementById('user-count').innerText = "VISORES: " + c);
 
         function updateClock() {
             setInterval(() => {
