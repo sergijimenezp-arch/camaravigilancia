@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GrowXpertIT AI Security Pro</title>
+    <title>GrowXpertIT BIOMETRIC PRO + RE-ID</title>
     <script src="/socket.io/socket.io.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
     <style>
@@ -13,16 +13,15 @@
         .monitor { position: relative; width: 100vw; height: 100vh; display: none; }
         #canvas-container { position: relative; width: 100%; height: 85%; display: flex; justify-content: center; align-items: center; background: #000; }
         canvas { position: absolute; }
-        video { position: absolute; visibility: hidden; } /* Procesado en background */
+        video { position: absolute; visibility: hidden; } 
         .ui-overlay { position: absolute; width: 100%; height: 100%; pointer-events: none; padding: 20px; z-index: 10; }
-        .top-left { top: 0; left: 0; }
+        .top-left { top: 0; left: 0; border-left: 2px solid #00ff41; padding-left:10px; }
         .top-right { top: 0; right: 0; text-align: right; padding-right: 40px; }
         .btn-panel { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; pointer-events: all; z-index: 20; }
         button { background: #00ff41; color: #000; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer; }
         button.alarm { background: #ff0000; color: #fff; }
         #status-bar { position: absolute; bottom: 80px; width: 100%; text-align: center; background: rgba(0,255,0,0.1); }
         
-        /* AGREGADO: UI para identificar intrusos (Solo visible en móvil) */
         #intruder-ui { 
             display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
             background: rgba(0,0,0,0.9); padding: 20px; border: 2px solid #ff0000; z-index: 100; 
@@ -33,28 +32,27 @@
 <body>
 
     <div id="login-screen">
-        <h2>GROWXPERT-IT SECURE ACCESS</h2>
+        <h2>GROWXPERT-IT SECURE BIOMETRICS</h2>
         <input type="text" id="user" placeholder="USUARIO">
         <input type="password" id="pass" placeholder="CONTRASEÑA">
-        <button onclick="checkLogin()">ACCEDER AL SISTEMA</button>
+        <button onclick="checkLogin()">ACCEDER</button>
     </div>
 
     <div class="monitor" id="main-ui">
         
         <div id="intruder-ui">
             <div style="color: #ff0000; font-size: 1.5em; font-weight: bold;">⚠️ INTRUSO: <span id="timer-val">30</span>s</div>
-            <input type="text" id="subject-name" placeholder="Nombre del sujeto...">
-            <button onclick="saveSubject()">VALIDAR SUJETO</button>
+            <input type="text" id="subject-name" placeholder="Nombre para BD...">
+            <button onclick="saveSubject()">GUARDAR EN MEMORIA</button>
         </div>
 
         <div class="ui-overlay top-left">
             <div><strong>GROWXPERT-IT AI SYSTEM</strong></div>
             <div id="date">--/--/----</div>
-            <div>USERS: <span id="user-count">0</span></div>
-            <div id="subject-info" style="color: yellow; margin-top: 10px;">SUJETO: DESCONOCIDO</div>
+            <div id="db-count" style="color: cyan;">BASE DE DATOS: 0 SUJETOS</div>
         </div>
         <div class="ui-overlay top-right">
-            <div style="color: red; animation: blink 1s infinite;">● LIVE</div>
+            <div style="color: red; animation: blink 1s infinite;">● REC</div>
             <div id="clock">00:00:00</div>
         </div>
 
@@ -66,8 +64,8 @@
         <div id="status-bar">SISTEMA INICIALIZANDO...</div>
 
         <div class="btn-panel">
-            <button id="btnTransmit" style="display:none;" onclick="startEverything()">1. ACTIVAR CÁMARA E IA</button>
-            <button class="alarm" onclick="sendAlarm()">⚠️ ACTIVAR ALARMA REMOTA</button>
+            <button id="btnTransmit" style="display:none;" onclick="startEverything()">1. ACTIVAR SENSORES (PC)</button>
+            <button class="alarm" onclick="sendAlarm()">🚨 ALARMA GLOBAL</button>
         </div>
     </div>
 
@@ -79,15 +77,19 @@
         const vCanvas = document.getElementById('video-canvas');
         const aCanvas = document.getElementById('ai-canvas');
         const vCtx = vCanvas.getContext('2d');
-        const aCtx = aCanvas.getContext('2d'); // Agregado para dibujar los cuadros en móvil
+        const aCtx = aCanvas.getContext('2d');
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         
         let modelsLoaded = false;
         
-        // AGREGADO: Variables para la lógica del intruso
+        // --- MEMORIA BIOMÉTRICA ---
+        let knownFacesDB = []; 
+        let faceMatcher = null; 
+        let latestUnknownDescriptor = null; 
+        
+        // --- TEMPORIZADOR ---
         let timerIntruso = null;
         let segundosRestantes = 30;
-        let sujetoValidado = false;
 
         function checkLogin() {
             if(document.getElementById('user').value === 'admin' && document.getElementById('pass').value === 'GrowXpert1234') {
@@ -98,104 +100,192 @@
         }
 
         async function loadModels() {
-            document.getElementById('status-bar').innerText = "CARGANDO MODELOS DE IA...";
+            document.getElementById('status-bar').innerText = "CARGANDO REDES NEURONALES...";
             const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+            
             await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            
             modelsLoaded = true;
-            document.getElementById('status-bar').innerText = "SISTEMA LISTO";
+            document.getElementById('status-bar').innerText = "SISTEMA LISTO. IA ACTIVA.";
             if(!isMobile) document.getElementById('btnTransmit').style.display = 'block';
             updateClock();
+        }
+
+        // --- FUNCIÓN MATEMÁTICA: ESCÁNER DE ROPA ---
+        function detectClothingColor(ctx, box, canvasW, canvasH) {
+            // Adivinamos dónde está el torso: debajo de la cara, un poco más ancho
+            let tX = Math.max(0, box.x - box.width * 0.5);
+            let tY = Math.max(0, box.y + box.height * 1.2);
+            let tW = Math.min(canvasW - tX, box.width * 2);
+            let tH = Math.min(canvasH - tY, box.height * 1.5);
+
+            if (tW <= 0 || tH <= 0) return "ROPA: ?";
+
+            try {
+                // Sacamos los píxeles de la zona del torso
+                let imgData = ctx.getImageData(tX, tY, tW, tH).data;
+                let r=0, g=0, b=0, count=0;
+                
+                // Analizamos 1 de cada 4 píxeles para ir muy rápido
+                for (let i = 0; i < imgData.length; i += 16) {
+                    r += imgData[i];
+                    g += imgData[i+1];
+                    b += imgData[i+2];
+                    count++;
+                }
+                if(count === 0) return "ROPA: ?";
+                r = Math.floor(r/count);
+                g = Math.floor(g/count);
+                b = Math.floor(b/count);
+
+                return "ROPA: " + getClosestColorName(r, g, b);
+            } catch(e) {
+                return "ROPA: ?";
+            }
+        }
+
+        // Diccionario de colores
+        function getClosestColorName(r, g, b) {
+            const colors = [
+                { name: "NEGRO", r: 30, g: 30, b: 30 },
+                { name: "BLANCO", r: 240, g: 240, b: 240 },
+                { name: "GRIS", r: 128, g: 128, b: 128 },
+                { name: "ROJO", r: 200, g: 30, b: 30 },
+                { name: "VERDE", r: 30, g: 200, b: 30 },
+                { name: "AZUL", r: 30, g: 30, b: 200 },
+                { name: "AMARILLO", r: 220, g: 220, b: 50 },
+                { name: "NARANJA", r: 220, g: 120, b: 30 },
+                { name: "MORADO", r: 128, g: 30, b: 128 }
+            ];
+            let minDist = Infinity;
+            let closest = "?";
+            for (let c of colors) {
+                let dist = Math.sqrt(Math.pow(c.r - r, 2) + Math.pow(c.g - g, 2) + Math.pow(c.b - b, 2));
+                if (dist < minDist) { minDist = dist; closest = c.name; }
+            }
+            return closest;
         }
 
         async function startEverything() {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             video.srcObject = stream;
-            document.getElementById('btnTransmit').innerText = "SISTEMA ARMADO Y TRANSMITIENDO";
+            document.getElementById('btnTransmit').style.display = 'none';
+            document.getElementById('status-bar').innerText = "VIGILANCIA EN CURSO...";
             
             setInterval(async () => {
-                // Ajustar tamaños
                 vCanvas.width = aCanvas.width = 640;
                 vCanvas.height = aCanvas.height = 480;
-                
-                // Dibujar video
                 vCtx.drawImage(video, 0, 0, 640, 480);
                 
-                let dataFaces = []; // AGREGADO: Guardar coordenadas de las caras
+                let dataFaces = [];
 
-                // Detección IA
                 if(modelsLoaded) {
-                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
-                    const resizedDetections = faceapi.resizeResults(detections, { width: 640, height: 480 });
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
                     
-                    // Dibujar cuadrados locales
-                    faceapi.draw.drawDetections(aCanvas, resizedDetections);
+                    const resizedDetections = faceapi.resizeResults(detections, { width: 640, height: 480 });
+                    aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
 
-                    // Extraer coordenadas para enviar al móvil
-                    dataFaces = detections.map(d => ({ x: d.box.x, y: d.box.y, w: d.box.width, h: d.box.height }));
+                    resizedDetections.forEach(d => {
+                        const box = d.detection.box;
+                        let label = "DESCONOCIDO";
+                        let colorHex = "#ff0000";
+
+                        // 1. MEMORIA FACIAL
+                        if (faceMatcher) {
+                            const match = faceMatcher.findBestMatch(d.descriptor);
+                            if (match.label !== "unknown") {
+                                label = match.label;
+                                colorHex = "#00ff41"; 
+                            } else {
+                                latestUnknownDescriptor = d.descriptor; 
+                            }
+                        } else {
+                            latestUnknownDescriptor = d.descriptor;
+                        }
+
+                        // 2. ESCÁNER DE ROPA
+                        let ropaColor = detectClothingColor(vCtx, box, 640, 480);
+
+                        // 3. DIBUJAR EN EL PC
+                        aCtx.strokeStyle = colorHex;
+                        aCtx.lineWidth = 3;
+                        aCtx.strokeRect(box.x, box.y, box.width, box.height);
+                        
+                        // Textos (Nombre arriba, ropa abajo)
+                        aCtx.fillStyle = colorHex;
+                        aCtx.font = "bold 16px monospace";
+                        aCtx.fillText(label, box.x, box.y - 10);
+                        aCtx.fillText(ropaColor, box.x, box.y + box.height + 20);
+
+                        // 4. GUARDAR PARA EL MÓVIL
+                        dataFaces.push({ 
+                            x: box.x, y: box.y, w: box.width, h: box.height, 
+                            name: label, clothing: ropaColor 
+                        });
+                    });
                 }
 
-                // Enviar al servidor (MODIFICADO para enviar imagen + caras)
                 socket.emit('streaming', {
-                    image: vCanvas.toDataURL('image/jpeg', 0.5),
+                    image: vCanvas.toDataURL('image/jpeg', 0.4),
                     faces: dataFaces
                 });
-            }, 100);
+            }, 150); 
         }
 
-        // --- SISTEMA DE ALARMA MEJORADO ---
-        function sendAlarm() {
-            socket.emit('trigger-alarm');
-        }
-
-        socket.on('action-alarm', () => {
-            // Generar sonido sintético (no depende de archivos externos)
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            
-            oscillator.type = 'sawtooth';
-            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Tono de alarma
-            oscillator.connect(gain);
-            gain.connect(audioCtx.destination);
-            
-            oscillator.start();
-            document.body.style.background = "red";
-            
-            setTimeout(() => {
-                oscillator.stop();
-                document.body.style.background = "black";
-            }, 3000);
+        // --- APRENDIZAJE DESDE EL MÓVIL ---
+        socket.on('register-subject', (name) => {
+            if (latestUnknownDescriptor && !isMobile) {
+                const newProfile = new faceapi.LabeledFaceDescriptors(name.toUpperCase(), [latestUnknownDescriptor]);
+                knownFacesDB.push(newProfile);
+                faceMatcher = new faceapi.FaceMatcher(knownFacesDB, 0.5);
+                
+                document.getElementById('db-count').innerText = "BASE DE DATOS: " + knownFacesDB.length + " SUJETOS";
+                document.getElementById('status-bar').innerText = "Sujeto " + name.toUpperCase() + " guardado.";
+                latestUnknownDescriptor = null;
+            }
         });
 
-        // --- RECIBIR STREAM (MÓVIL) (MODIFICADO para recibir caras) ---
+        // --- RECEPCIÓN EN EL MÓVIL ---
         socket.on('play-stream', (data) => {
             const img = new Image();
             img.onload = () => {
                 vCanvas.width = aCanvas.width = 640; 
                 vCanvas.height = aCanvas.height = 480;
-                
-                // Dibujar la imagen
                 vCtx.drawImage(img, 0, 0);
 
-                // AGREGADO: Dibujar los cuadrados recibidos de la IA
                 aCtx.clearRect(0, 0, aCanvas.width, aCanvas.height);
+                
+                let hayDesconocidos = false;
+
                 data.faces.forEach(face => {
-                    aCtx.strokeStyle = sujetoValidado ? "#00ff41" : "#ff0000";
+                    const isKnown = face.name !== "DESCONOCIDO";
+                    if(!isKnown) hayDesconocidos = true;
+
+                    aCtx.strokeStyle = isKnown ? "#00ff41" : "#ff0000";
                     aCtx.lineWidth = 3;
                     aCtx.strokeRect(face.x, face.y, face.w, face.h);
+                    
+                    // Dibujar Nombre y Ropa en el móvil
+                    aCtx.fillStyle = isKnown ? "#00ff41" : "#ff0000";
+                    aCtx.font = "bold 16px monospace";
+                    aCtx.fillText(face.name, face.x, face.y - 10);
+                    aCtx.fillText(face.clothing, face.x, face.y + face.h + 20);
                 });
 
-                // AGREGADO: Lógica del temporizador de 30s
-                if (data.faces.length > 0 && !sujetoValidado && isMobile) {
+                // Lógica Intruso
+                if (hayDesconocidos && isMobile) {
                     if (!timerIntruso) startIntruderTimer();
-                } else if (data.faces.length === 0) {
+                } else if (!hayDesconocidos) {
                     resetIntruderTimer();
                 }
             };
-            img.src = data.image; // Ahora data.image tiene el base64
+            img.src = data.image; 
         });
 
-        // AGREGADO: Funciones para manejar el temporizador y el nombre
         function startIntruderTimer() {
             document.getElementById('intruder-ui').style.display = 'block';
             segundosRestantes = 30;
@@ -215,26 +305,31 @@
             clearInterval(timerIntruso);
             timerIntruso = null;
             document.getElementById('intruder-ui').style.display = 'none';
-            if(!sujetoValidado) {
-                document.getElementById('subject-info').innerText = "SUJETO: DESCONOCIDO";
-            }
         }
 
         function saveSubject() {
             const name = document.getElementById('subject-name').value;
             if (name) {
-                sujetoValidado = true;
-                clearInterval(timerIntruso);
-                document.getElementById('intruder-ui').style.display = 'none';
-                document.getElementById('subject-info').innerText = "SUJETO: " + name.toUpperCase();
-                document.getElementById('subject-name').value = ""; // Limpiar para el siguiente
-                
-                // El sujeto vuelve a ser desconocido después de 15 segundos para pruebas
-                setTimeout(() => { sujetoValidado = false; resetIntruderTimer(); }, 15000);
+                socket.emit('learn-subject', name); 
+                document.getElementById('subject-name').value = "";
+                resetIntruderTimer();
             }
         }
 
-        socket.on('user-count', c => document.getElementById('user-count').innerText = c);
+        // --- ALARMA GLOBAL ---
+        function sendAlarm() { socket.emit('trigger-alarm'); }
+
+        socket.on('action-alarm', () => {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start();
+            document.body.style.background = "red";
+            setTimeout(() => { osc.stop(); document.body.style.background = "black"; }, 3000);
+        });
 
         function updateClock() {
             setInterval(() => {
